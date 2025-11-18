@@ -1,0 +1,19 @@
+/target
+**/*.rs.bk
+
+# Debug and build artifacts
+debug
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.iml
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
