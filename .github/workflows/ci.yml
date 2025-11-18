@@ -20,6 +20,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
 
       - name: Show rustc version
         run: rustc -Vv
@@ -48,6 +49,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+          components: rustfmt, clippy
 
       - name: Run arena_vs_box benchmark (short)
         env:
