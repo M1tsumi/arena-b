@@ -37,7 +37,11 @@ impl<'a> Parser<'a> {
                 Some(b'+') | Some(b'-') => {
                     let op = self.bump().unwrap() as char;
                     let right = self.parse_mul();
-                    let expr = Expr::Binary { op, left: node, right };
+                    let expr = Expr::Binary {
+                        op,
+                        left: node,
+                        right,
+                    };
                     node = self.alloc_expr(expr);
                 }
                 _ => break,
@@ -54,7 +58,11 @@ impl<'a> Parser<'a> {
                 Some(b'*') | Some(b'/') => {
                     let op = self.bump().unwrap() as char;
                     let right = self.parse_primary();
-                    let expr = Expr::Binary { op, left: node, right };
+                    let expr = Expr::Binary {
+                        op,
+                        left: node,
+                        right,
+                    };
                     node = self.alloc_expr(expr);
                 }
                 _ => break,

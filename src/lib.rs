@@ -303,15 +303,13 @@ impl Arena {
         #[cfg(feature = "stats")]
         {
             if size > 0 {
-                self
-                    .bytes_used
-                    .set(
-                        self
-                            .bytes_used
-                            .get()
-                            .checked_add(size)
-                            .expect("arena size overflow"),
-                    );
+                self.bytes_used.set(
+                    self
+                        .bytes_used
+                        .get()
+                        .checked_add(size)
+                        .expect("arena size overflow"),
+                );
             }
             self
                 .allocation_count
@@ -372,9 +370,7 @@ unsafe fn allocate_chunk(capacity: usize) -> Chunk {
 fn next_chunk_capacity(prev_capacity: usize, layout: &Layout) -> usize {
     let align = layout.align();
     let size = layout.size();
-    let min_needed = size
-        .checked_add(align)
-        .expect("arena size overflow");
+    let min_needed = size.checked_add(align).expect("arena size overflow");
     let mut capacity = prev_capacity.saturating_mul(2);
     if capacity < min_needed {
         capacity = min_needed;

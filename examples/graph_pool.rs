@@ -32,9 +32,18 @@ fn main() {
     let pool: Pool<Node> = Pool::with_capacity(8);
     let mut nodes: Vec<Pooled<Node>> = Vec::new();
 
-    let a = pool.alloc(Node { value: 1, neighbors: Vec::new() });
-    let b = pool.alloc(Node { value: 2, neighbors: Vec::new() });
-    let c = pool.alloc(Node { value: 3, neighbors: Vec::new() });
+    let a = pool.alloc(Node {
+        value: 1,
+        neighbors: Vec::new(),
+    });
+    let b = pool.alloc(Node {
+        value: 2,
+        neighbors: Vec::new(),
+    });
+    let c = pool.alloc(Node {
+        value: 3,
+        neighbors: Vec::new(),
+    });
 
     nodes.push(a);
     nodes.push(b);

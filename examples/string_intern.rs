@@ -5,14 +5,7 @@ fn main() {
     let arena = Arena::with_capacity(64 * 1024);
     let mut interns: HashSet<&str> = HashSet::new();
 
-    let words = [
-        "apple",
-        "banana",
-        "apple",
-        "orange",
-        "banana",
-        "pear",
-    ];
+    let words = ["apple", "banana", "apple", "orange", "banana", "pear"];
 
     for w in &words {
         let interned = match interns.get::<str>(w) {
