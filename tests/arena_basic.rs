@@ -36,6 +36,7 @@ fn reset_allows_reuse() {
     assert_eq!(*second, 2);
 }
 
+#[cfg(feature = "stats")]
 #[test]
 fn stats_track_usage() {
     let arena = Arena::with_capacity(1024);
@@ -62,6 +63,7 @@ fn alloc_slice_uninit_zero_len() {
     assert_eq!(slice.len(), 0);
 }
 
+#[cfg(feature = "stats")]
 #[test]
 fn zst_allocation_does_not_consume_space() {
     let arena = Arena::with_capacity(16);
@@ -84,6 +86,7 @@ fn multi_chunk_allocation_grows_arena() {
     assert!(stats_after_second.bytes_allocated >= stats_after_first.bytes_allocated);
 }
 
+#[cfg(feature = "stats")]
 #[test]
 fn scope_reclaims_allocations() {
     let arena = Arena::with_capacity(128);

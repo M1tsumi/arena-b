@@ -90,6 +90,12 @@ where
     }
 }
 
+impl Default for Arena {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Arena {
     const DEFAULT_CAPACITY: usize = 64 * 1024;
 
@@ -176,6 +182,7 @@ impl Arena {
     /// assert_eq!(*value, 42);
     /// ```
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc<T>(&self, value: T) -> &mut T {
         if mem::size_of::<T>() == 0 {
             self.record_allocation(0);
@@ -218,6 +225,7 @@ impl Arena {
     ///
     /// The elements must be initialized by the caller before they are read.
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc_slice_uninit<T>(&self, len: usize) -> &mut [MaybeUninit<T>] {
         if len == 0 {
             self.record_allocation(0);
@@ -401,6 +409,12 @@ pub struct Pooled<'pool, T> {
     pool: &'pool Pool<T>,
 }
 
+impl<T> Default for Pool<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> Pool<T> {
     #[inline]
     pub fn new() -> Self {
@@ -508,6 +522,12 @@ impl<'pool, T> Drop for Pooled<'pool, T> {
 
 pub struct SyncArena {
     inner: Mutex<Arena>,
+}
+
+impl Default for SyncArena {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SyncArena {
