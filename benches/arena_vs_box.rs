@@ -1,7 +1,7 @@
 use std::boxed::Box;
 use std::hint::black_box;
 
-use bumper::{Arena, Pool};
+use arena_b::{Arena, Pool};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn bench_arena_alloc(c: &mut Criterion) {

@@ -1,5 +1,5 @@
 [package]
-name = "bumper"
+name = "arena-b"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -7,12 +7,12 @@ description = "High-performance bump allocation arena for Rust"
 readme = "README.md"
 repository = "https://github.com/pawso/Bumper"
 homepage = "https://github.com/pawso/Bumper"
-documentation = "https://docs.rs/bumper"
+documentation = "https://docs.rs/arena-b"
 keywords = ["allocator", "memory", "arena", "bump", "pool"]
 categories = ["memory-management", "data-structures"]
 
 [lib]
-name = "bumper"
+name = "arena_b"
 path = "src/lib.rs"
 
 [dependencies]

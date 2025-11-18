@@ -1,13 +1,13 @@
 # Advanced Usage
 
-This guide covers advanced `bumper` features: configuration, stats control, thread safety, and benchmarking.
+This guide covers advanced `arena-b` features: configuration, stats control, thread safety, and benchmarking.
 
 ## 1. Configuring arenas with `ArenaBuilder`
 
 Use `ArenaBuilder` to tune capacities for your workload:
 
 ```rust
-use bumper::{Arena, ArenaBuilder};
+use arena_b::{Arena, ArenaBuilder};
 
 fn make_arena() -> Arena {
     Arena::builder()
@@ -26,7 +26,7 @@ fn make_arena() -> Arena {
 
 ## 2. Controlling stats overhead
 
-By default, `bumper` tracks per-allocation statistics:
+By default, `arena-b` tracks per-allocation statistics:
 
 - `bytes_used`
 - `allocation_count`
@@ -49,7 +49,7 @@ When the `stats` feature is disabled, `record_allocation` becomes a no-op; stats
 `SyncArena` wraps an `Arena` in a `Mutex` so it can be safely shared between threads:
 
 ```rust
-use bumper::SyncArena;
+use arena_b::SyncArena;
 use std::sync::Arc;
 use std::thread;
 

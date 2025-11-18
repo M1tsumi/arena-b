@@ -1,10 +1,10 @@
 # Architecture
 
-This document describes the internal architecture of `bumper` and the invariants that keep the unsafe code sound.
+This document describes the internal architecture of `arena-b` and the invariants that keep the unsafe code sound.
 
 ## 1. High-level overview
 
-`bumper` provides three core building blocks:
+`arena-b` provides three core building blocks:
 
 - `Arena`: a bump allocator for grouping allocations and freeing them all at once.
 - `Pool<T>`: a slot-based pool allocator for many values of the same type.

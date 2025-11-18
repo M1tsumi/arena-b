@@ -1,4 +1,4 @@
-use bumper::Arena;
+use arena_b::Arena;
 
 #[derive(Debug)]
 enum Expr<'a> {

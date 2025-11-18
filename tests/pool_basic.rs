@@ -1,4 +1,4 @@
-use bumper::{Pool, PoolStats};
+use arena_b::{Pool, PoolStats};
 
 #[test]
 fn pool_alloc_basic() {

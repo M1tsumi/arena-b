@@ -1,6 +1,6 @@
-# Bumper Strategies
+# arena-b Strategies
 
-This guide explains the allocation strategies implemented by `bumper` and when to use each.
+This guide explains the allocation strategies implemented by `arena-b` and when to use each.
 
 ## 1. Bump Arena (`Arena`)
 
@@ -21,7 +21,7 @@ This guide explains the allocation strategies implemented by `bumper` and when t
 ### Example pattern
 
 ```rust
-use bumper::Arena;
+use arena_b::Arena;
 
 fn build_scene(arena: &Arena) {
     arena.scope(|scope| {
@@ -52,7 +52,7 @@ fn build_scene(arena: &Arena) {
 ### Example pattern
 
 ```rust
-use bumper::{Pool, PoolStats};
+use arena_b::{Pool, PoolStats};
 
 fn work_with_pool() {
     let pool: Pool<u32> = Pool::with_capacity(128);

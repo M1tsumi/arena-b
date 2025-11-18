@@ -19,8 +19,8 @@ const CHUNK_ALIGN: usize = 64;
 ///
 /// # Examples
 ///
-/// ```
-/// use bumper::Arena;
+/// ```rust
+/// use arena_b::Arena;
 ///
 /// let arena = Arena::new();
 /// let value = arena.alloc(42);
@@ -168,8 +168,8 @@ impl Arena {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use bumper::Arena;
+    /// ```rust
+    /// use arena_b::Arena;
     ///
     /// let arena = Arena::new();
     /// let value = arena.alloc(42);

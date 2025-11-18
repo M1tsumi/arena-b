@@ -1,4 +1,4 @@
-use bumper::Arena;
+use arena_b::Arena;
 use std::collections::HashSet;
 
 fn main() {

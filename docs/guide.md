@@ -1,6 +1,6 @@
-# Bumper: Getting Started
+# arena-b: Getting Started
 
-This guide shows how to add `bumper` to your project, create your first arena, and understand when to use it versus `Box` and `Vec`.
+This guide shows how to add `arena-b` to your project, create your first arena, and understand when to use it versus `Box` and `Vec`.
 
 ## 1. Installing
 
@@ -8,20 +8,20 @@ Add this to your `Cargo.toml` while developing locally:
 
 ```toml
 [dependencies]
-bumper = { path = "." }
+arena-b = { path = "." }
 ```
 
 Once published to crates.io, you will instead depend on a version:
 
 ```toml
 [dependencies]
-bumper = "0.1"
+arena-b = "0.1"
 ```
 
 ## 2. Your first arena
 
 ```rust
-use bumper::Arena;
+use arena_b::Arena;
 
 fn main() {
     let arena = Arena::new();
@@ -40,7 +40,7 @@ All allocations made from `arena` are freed at once when the arena is dropped (o
 Use `scope` to allocate temporary data and reclaim it automatically at the end of the scope:
 
 ```rust
-use bumper::Arena;
+use arena_b::Arena;
 
 fn compute(arena: &Arena) {
     arena.scope(|scope| {
@@ -70,7 +70,7 @@ This pattern is ideal for per-frame or per-request scratch data: everything allo
 For many fixed-size allocations with reuse, use `Pool<T>`:
 
 ```rust
-use bumper::Pool;
+use arena_b::Pool;
 
 fn example_pool() {
     let pool: Pool<u32> = Pool::with_capacity(1024);
@@ -90,7 +90,7 @@ For multi-threaded programs, wrap the arena in `SyncArena`:
 ```rust
 use std::sync::Arc;
 use std::thread;
-use bumper::SyncArena;
+use arena_b::SyncArena;
 
 fn main() {
     let arena = Arc::new(SyncArena::with_capacity(64 * 1024));
@@ -116,7 +116,7 @@ fn main() {
 
 ## 7. Real-world examples (in everyday English)
 
-The `examples/` folder contains small programs that show how you might use `bumper` in real applications. Here is what each one does and why it can be faster than normal allocations.
+The `examples/` folder contains small programs that show how you might use `arena-b` in real applications. Here is what each one does and why it can be faster than normal allocations.
 
 ### 7.1 Parser example (`parser_expr.rs`)
 

@@ -1,30 +1,30 @@
-# bumper
+# arena-b
 
-[![Crates.io](https://img.shields.io/crates/v/bumper.svg)](https://crates.io/crates/bumper)
-[![Docs.rs](https://docs.rs/bumper/badge.svg)](https://docs.rs/bumper)
+[![Crates.io](https://img.shields.io/crates/v/arena-b.svg)](https://crates.io/crates/arena-b)
+[![Docs.rs](https://docs.rs/arena-b/badge.svg)](https://docs.rs/arena-b)
 [![CI](https://github.com/pawso/Bumper/actions/workflows/ci.yml/badge.svg)](https://github.com/pawso/Bumper/actions/workflows/ci.yml)
 ![Rust](https://img.shields.io/badge/language-Rust-orange.svg)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-`bumper` is a high-performance **bump allocator** / **arena allocator** and **memory pool** crate for Rust. It is designed for allocation-heavy workloads such as parsers, compilers, game engines, simulations, and data processing, while keeping a clean, idiomatic Rust API.
+`arena-b` is a high-performance **bump allocator** / **arena allocator** and **memory pool** crate for Rust. It is designed for allocation-heavy workloads such as parsers, compilers, game engines, simulations, and data processing, while keeping a clean, idiomatic Rust API.
 
-The core type is `bumper::Arena`, a bump allocator that lets you allocate many values cheaply and reclaim them all at once when the arena is reset or dropped.
+The core type is `arena_b::Arena`, a bump allocator that lets you allocate many values cheaply and reclaim them all at once when the arena is reset or dropped.
 
 ## Installation
 
-`bumper` is published on [crates.io](https://crates.io/crates/bumper).
+`arena-b` is published on [crates.io](https://crates.io/crates/arena-b).
 
 Add it to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bumper = "0.1"
+arena-b = "0.1"
 ```
 
 Or, using `cargo add`:
 
 ```bash
-cargo add bumper
+cargo add arena-b
 ```
 
 ### Optional: disable `stats` for hot builds
@@ -34,24 +34,24 @@ You can disable it to remove even the small accounting overhead:
 
 ```toml
 [dependencies]
-bumper = { version = "0.1", default-features = false }
+arena-b = { version = "0.1", default-features = false }
 ```
 
 ### Using a local checkout (for contributors)
 
-If you are hacking on `bumper` itself, depend on it via a local path:
+If you are hacking on `arena-b` itself, depend on it via a local path:
 
 ```toml
 [dependencies]
-bumper = { path = "../bumper" }
+arena-b = { path = "../bumper" }
 ```
 
 ## Getting started
 
-The simplest way to use `bumper` is with an arena:
+The simplest way to use `arena-b` is with an arena:
 
 ```rust
-use bumper::Arena;
+use arena_b::Arena;
 
 fn main() {
     let arena = Arena::new();
@@ -65,7 +65,7 @@ fn main() {
 Use `Arena::scope` to allocate many temporary values and free them all at once:
 
 ```rust
-use bumper::Arena;
+use arena_b::Arena;
 
 fn main() {
     let arena = Arena::new();
@@ -84,7 +84,7 @@ fn main() {
 Use `Pool<T>` when you have many values of the same type that are reused:
 
 ```rust
-use bumper::Pool;
+use arena_b::Pool;
 
 fn main() {
     let pool = Pool::<String>::with_capacity(128);
@@ -197,7 +197,7 @@ The end result is more **stable and predictable frame times**, which translates 
   - More advanced debugging and visualization helpers
   - `no_std` support and async-friendly integrations
 
-`bumper` aims to be a fast, ergonomic Rust arena allocator and memory pool library that feels native to Rust while offering production-grade safety and documentation.
+`arena-b` aims to be a fast, ergonomic Rust arena allocator and memory pool library that feels native to Rust while offering production-grade safety and documentation.
 
 ## License
 

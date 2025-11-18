@@ -1,4 +1,4 @@
-use bumper::{Pool, PoolStats, Pooled};
+use arena_b::{Pool, PoolStats, Pooled};
 
 #[derive(Debug)]
 struct Node {

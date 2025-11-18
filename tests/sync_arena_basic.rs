@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::thread;
 
-use bumper::SyncArena;
+use arena_b::SyncArena;
 
 #[test]
 fn sync_arena_multithread_basic() {

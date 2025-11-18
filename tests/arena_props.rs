@@ -1,4 +1,4 @@
-use bumper::Arena;
+use arena_b::Arena;
 use proptest::prelude::*;
 
 proptest! {

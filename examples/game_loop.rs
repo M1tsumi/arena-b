@@ -1,4 +1,4 @@
-use bumper::Arena;
+use arena_b::Arena;
 use std::mem::MaybeUninit;
 use std::time::Instant;
 
