@@ -304,16 +304,13 @@ impl Arena {
         {
             if size > 0 {
                 self.bytes_used.set(
-                    self
-                        .bytes_used
+                    self.bytes_used
                         .get()
                         .checked_add(size)
                         .expect("arena size overflow"),
                 );
             }
-            self
-                .allocation_count
-                .set(self.allocation_count.get() + 1);
+            self.allocation_count.set(self.allocation_count.get() + 1);
         }
 
         #[cfg(not(feature = "stats"))]
