@@ -12,6 +12,9 @@ use std::vec::Vec;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::*;
+
 const CHUNK_ALIGN: usize = 64;
 const DEFAULT_CHUNK_SIZE: usize = 64 * 1024;
 const MIN_CHUNK_SIZE: usize = 4096;
@@ -308,10 +311,23 @@ impl Arena {
         }
     }
 
-    #[cfg(not(target_arch = "x86_64"))]
+    /// Optimized prefetch for aarch64 (Apple Silicon)
+    #[inline]
+    #[cfg(target_arch = "aarch64")]
+    unsafe fn prefetch(&self, addr: *const u8) {
+        if is_aarch64_feature_detected!("neon") {
+            // Prefetch multiple cache lines for better performance
+            for i in 0..PREFETCH_WARMUP_SIZE {
+                let prefetch_addr = addr.add(i * 64);
+                std::arch::aarch64::_prefetch(prefetch_addr, 0); // PLDL1KEEP
+            }
+        }
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
     #[inline]
     unsafe fn prefetch(&self, _addr: *const u8) {
-        // No prefetch on non-x86_64 architectures
+        // No prefetch on other architectures
     }
 
     #[cold]
@@ -591,7 +607,7 @@ impl Arena {
             let ptr = self.allocate_raw(layout).cast::<T>();
             // Use optimized copy for large slices
             let total_bytes = mem::size_of_val(slice);
-            if total_bytes >= SIMD_THRESHOLD && cfg!(target_arch = "x86_64") {
+            if total_bytes >= SIMD_THRESHOLD && cfg!(any(target_arch = "x86_64", target_arch = "aarch64")) {
                 self.copy_large_slice_optimized(slice.as_ptr(), ptr, len, total_bytes);
             } else {
                 ptr::copy_nonoverlapping(slice.as_ptr(), ptr, len);
@@ -660,7 +676,7 @@ impl Arena {
         }
     }
 
-    #[cfg(not(target_arch = "x86_64"))]
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
     unsafe fn copy_large_slice_optimized<T: Copy>(
         &self,
         src: *const T,
