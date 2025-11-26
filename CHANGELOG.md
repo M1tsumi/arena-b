@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.1] - URL Update Release
+
+### Changed
+
+- Updated repository URL to `https://github.com/M1tsumi/arena-b`
+- Updated homepage URL to `https://quefep.uk`
+- Updated CI badge to point to new repository location
+
 ## [0.3.0] - Major Performance Release
 
 ### Performance Improvements

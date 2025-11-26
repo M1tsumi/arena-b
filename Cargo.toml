@@ -1,12 +1,12 @@
 [package]
 name = "arena-b"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "High-performance bump allocation arena for Rust"
 readme = "README.md"
-repository = "https://github.com/pawso/Bumper"
-homepage = "https://github.com/pawso/Bumper"
+repository = "https://github.com/M1tsumi/arena-b"
+homepage = "https://quefep.uk"
 documentation = "https://docs.rs/arena-b"
 keywords = ["allocator", "memory", "arena", "bump", "pool"]
 categories = ["memory-management", "data-structures"]
