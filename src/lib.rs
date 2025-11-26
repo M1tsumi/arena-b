@@ -19,6 +19,10 @@ const MAX_CHUNK_SIZE: usize = 16 * 1024 * 1024;
 const ALIGNMENT_MASK: usize = CHUNK_ALIGN - 1;
 const SIMD_THRESHOLD: usize = 1024;
 
+// Fast-path optimizations
+const FAST_ALLOC_THRESHOLD: usize = 1024;  // Fast path for small allocations
+const PREFETCH_WARMUP_SIZE: usize = 8;     // Number of cache lines to prefetch
+
 // Size classes for optimized allocation
 const SIZE_CLASSES: &[usize] = &[8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096];
 
@@ -291,12 +295,16 @@ impl Arena {
         None
     }
 
-    /// Prefetch memory for better cache performance
+    /// Optimized prefetch with better cache line handling
     #[inline]
     #[cfg(target_arch = "x86_64")]
     unsafe fn prefetch(&self, addr: *const u8) {
         if is_x86_feature_detected!("avx2") {
-            _mm_prefetch(addr as *const i8, _MM_HINT_T0);
+            // Prefetch multiple cache lines for better performance
+            for i in 0..PREFETCH_WARMUP_SIZE {
+                let prefetch_addr = addr.add(i * 64);
+                _mm_prefetch(prefetch_addr as *const i8, _MM_HINT_T0);
+            }
         }
     }
 
@@ -329,7 +337,179 @@ impl Arena {
         chunk.ptr.as_ptr().add(aligned)
     }
 
-    /// Allocates space for `value` in the arena and returns a mutable reference.
+    /// Ultra-fast allocation for small types (≤ FAST_ALLOC_THRESHOLD bytes)
+    /// 
+    /// This method uses an optimized fast-path that minimizes atomic operations
+    /// for small, frequently allocated types.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// let arena = arena_b::Arena::new();
+    /// let x = arena.alloc_fast(42);
+    /// *x = 7;
+    /// ```
+    #[inline]
+    #[allow(clippy::mut_from_ref)]
+    pub fn alloc_fast<T>(&self, value: T) -> &mut T {
+        let layout = Layout::new::<T>();
+        let size = layout.size();
+        
+        // Use fast path for small allocations
+        if size <= FAST_ALLOC_THRESHOLD {
+            unsafe {
+                let ptr = self.allocate_fast_path(layout).cast::<T>();
+                ptr.write(value);
+                &mut *ptr
+            }
+        } else {
+            // Fallback to standard allocation for larger objects
+            self.alloc(value)
+        }
+    }
+
+    /// Optimized fast-path allocation for small objects
+    /// 
+    /// This method reduces atomic operation overhead by using relaxed ordering
+    /// and optimizing the common case where allocation fits in the current chunk.
+    #[inline]
+    unsafe fn allocate_fast_path(&self, layout: Layout) -> *mut u8 {
+        let size = layout.size();
+        let align = layout.align();
+        
+        if size == 0 {
+            #[cfg(feature = "stats")]
+            self.stats.allocation_count.fetch_add(1, Ordering::Relaxed);
+            return NonNull::<u8>::dangling().as_ptr();
+        }
+
+        // Try memory pool first for very small allocations
+        if size <= 512 {
+            if let Some(ptr) = self.try_pool_alloc(size, align) {
+                return ptr;
+            }
+        }
+
+        // Optimized arena fast-path with relaxed atomics
+        let inner = &mut *self.inner.get();
+        let current_chunk_idx = inner.current_chunk.load(Ordering::Relaxed);
+        let chunk = &mut inner.chunks[current_chunk_idx];
+        
+        // Use relaxed ordering for better performance in single-threaded scenarios
+        let current = chunk.used.load(Ordering::Relaxed);
+        let aligned = (current + align - 1) & !(align - 1);
+        let end = aligned + size;
+        
+        if likely(end <= chunk.capacity) {
+            // Fast-path: single atomic operation with relaxed ordering
+            if chunk.used.compare_exchange_weak(
+                current, 
+                end, 
+                Ordering::Relaxed, 
+                Ordering::Relaxed
+            ).is_ok() {
+                self.record_allocation(end - current);
+                return chunk.ptr.as_ptr().add(aligned);
+            }
+        }
+        
+        // Fallback to standard allocation
+        self.allocate_raw(layout)
+    }
+
+    /// Allocate an array with known size at compile time
+    /// 
+    /// This is optimized for fixed-size arrays where the size is known at compile time,
+    /// allowing for better compiler optimizations.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// let arena = arena_b::Arena::new();
+    /// let arr = arena.alloc_array([1, 2, 3, 4, 5]);
+    /// assert_eq!(arr.len(), 5);
+    /// ```
+    #[inline]
+    #[allow(clippy::mut_from_ref)]
+    pub fn alloc_array<T: Copy, const N: usize>(&self, values: [T; N]) -> &[T] {
+        if N == 0 {
+            return &[];
+        }
+        
+        let layout = Layout::array::<T>(N).unwrap();
+        unsafe {
+            let ptr = self.allocate_fast_path(layout).cast::<T>();
+            // Use optimized copy for small arrays
+            if N * mem::size_of::<T>() <= 256 {
+                // Manual loop for very small arrays (better optimization)
+                for (i, &item) in values.iter().enumerate().take(N) {
+                    ptr.add(i).write(item);
+                }
+            } else {
+                // Use optimized slice copy for larger arrays
+                ptr::copy_nonoverlapping(values.as_ptr(), ptr, N);
+            }
+            slice::from_raw_parts(ptr, N)
+        }
+    }
+
+    /// Allocate uninitialized array with known size
+    /// 
+    /// Returns a mutable slice of uninitialized memory that can be initialized later.
+    /// This is useful when you need to allocate first and initialize later.
+    ///
+    /// # Safety
+    ///
+    /// The caller must initialize all elements before reading from them.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// let arena = arena_b::Arena::new();
+    /// let mut arr = unsafe { arena.alloc_array_uninit::<u32, 10>() };
+    /// for i in 0..10 {
+    ///     arr[i].write(i as u32);
+    /// }
+    /// let initialized = unsafe { core::slice::from_raw_parts(arr.as_ptr(), 10) };
+    /// ```
+    #[inline]
+    #[allow(clippy::mut_from_ref)]
+    pub fn alloc_array_uninit<T, const N: usize>(&self) -> &mut [MaybeUninit<T>] {
+        if N == 0 {
+            return unsafe { slice::from_raw_parts_mut(NonNull::<MaybeUninit<T>>::dangling().as_ptr(), 0) };
+        }
+        
+        let layout = Layout::array::<T>(N).unwrap();
+        unsafe {
+            let ptr = self.allocate_fast_path(layout).cast::<MaybeUninit<T>>();
+            slice::from_raw_parts_mut(ptr, N)
+        }
+    }
+
+    /// Allocate multiple values of the same type in a single operation
+    /// 
+    /// This is optimized for bulk allocation patterns and reduces overhead
+    /// by calculating layout once and performing optimized allocation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// let arena = arena_b::Arena::new();
+    /// let values = arena.alloc_batch([1, 2, 3, 4, 5]);
+    /// assert_eq!(values.len(), 5);
+    /// ```
+    #[inline]
+    #[allow(clippy::mut_from_ref)]
+    pub fn alloc_batch<T: Copy>(&self, values: impl AsRef<[T]>) -> &[T] {
+        let slice = values.as_ref();
+        if slice.is_empty() {
+            return &[];
+        }
+        
+        self.alloc_slice_copy(slice)
+    }
+
+    /// Allocate space for `value` in the arena and returns a mutable reference.
     ///
     /// The returned reference is valid for as long as the arena lives or until
     /// the arena is reset.

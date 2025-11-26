@@ -1,14 +1,14 @@
 [package]
 name = "arena-b"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "High-performance bump allocation arena for Rust"
+description = "Ultra-fast bump allocation arena with specialized allocation methods for parsers, game engines, and data processing"
 readme = "README.md"
 repository = "https://github.com/M1tsumi/arena-b"
 homepage = "https://quefep.uk"
 documentation = "https://docs.rs/arena-b"
-keywords = ["allocator", "memory", "arena", "bump", "pool"]
+keywords = ["allocator", "memory", "arena", "bump", "pool", "performance", "fast", "parser", "gamedev"]
 categories = ["memory-management", "data-structures"]
 
 [lib]
@@ -35,4 +35,8 @@ harness = false
 
 [[bench]]
 name = "advanced_benchmarks"
+harness = false
+
+[[bench]]
+name = "v0_4_0_benchmarks"
 harness = false
