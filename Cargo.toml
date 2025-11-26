@@ -8,7 +8,7 @@ readme = "README.md"
 repository = "https://github.com/M1tsumi/arena-b"
 homepage = "https://quefep.uk"
 documentation = "https://docs.rs/arena-b"
-keywords = ["allocator", "memory", "arena", "bump", "pool", "performance", "fast", "parser", "gamedev"]
+keywords = ["allocator", "memory", "arena", "bump", "performance"]
 categories = ["memory-management", "data-structures"]
 
 [lib]
