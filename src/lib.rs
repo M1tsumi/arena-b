@@ -607,7 +607,9 @@ impl Arena {
             let ptr = self.allocate_raw(layout).cast::<T>();
             // Use optimized copy for large slices
             let total_bytes = mem::size_of_val(slice);
-            if total_bytes >= SIMD_THRESHOLD && cfg!(any(target_arch = "x86_64", target_arch = "aarch64")) {
+            if total_bytes >= SIMD_THRESHOLD
+                && cfg!(any(target_arch = "x86_64", target_arch = "aarch64"))
+            {
                 self.copy_large_slice_optimized(slice.as_ptr(), ptr, len, total_bytes);
             } else {
                 ptr::copy_nonoverlapping(slice.as_ptr(), ptr, len);
