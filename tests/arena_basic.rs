@@ -77,10 +77,11 @@ fn zst_allocation_does_not_consume_space() {
 
 #[test]
 fn multi_chunk_allocation_grows_arena() {
-    let arena = Arena::with_capacity(16);
-    let _ = arena.alloc([0_u8; 16]);
+    // Create a small arena that will definitely require chunk growth
+    let arena = Arena::with_capacity(32); // 32 bytes, rounded up to 64
+    let _ = arena.alloc([0_u8; 32]); // Uses 32 bytes, leaves 32
     let stats_after_first = arena.stats();
-    let _ = arena.alloc([0_u8; 16]);
+    let _ = arena.alloc([0_u8; 40]); // Needs 40 bytes, only 32 left - should trigger new chunk
     let stats_after_second = arena.stats();
     assert!(stats_after_second.chunk_count >= 2);
     assert!(stats_after_second.bytes_allocated >= stats_after_first.bytes_allocated);
