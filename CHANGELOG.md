@@ -9,9 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### 🛠️ Platform Compatibility
 
 - **Cross-Platform Build**: Verified builds on Ubuntu, Windows, and macOS
-- **CI Workflow Fixes**: Fixed toolchain interpolation issues in GitHub Actions
-- **Code Formatting**: Applied consistent formatting across all files
-- **Architecture Support**: Maintained x86_64 optimizations with fallback for other architectures
+- **Apple Silicon Support**: Added aarch64 architecture support for M1/M2 Macs
+- **Enhanced CI Pipeline**: Fixed toolchain interpolation and added architecture detection
+- **SIMD Optimizations**: Extended SIMD support to both x86_64 and aarch64 architectures
+- **Prefetch Optimizations**: Added NEON prefetch support for Apple Silicon
 
 ### 🔧 Technical Improvements
 
