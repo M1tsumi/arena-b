@@ -17,7 +17,6 @@ const DEFAULT_CHUNK_SIZE: usize = 64 * 1024;
 const MIN_CHUNK_SIZE: usize = 4096;
 const MAX_CHUNK_SIZE: usize = 16 * 1024 * 1024;
 const ALIGNMENT_MASK: usize = CHUNK_ALIGN - 1;
-const PREFETCH_DISTANCE: usize = 64;
 const SIMD_THRESHOLD: usize = 1024;
 
 // Size classes for optimized allocation
@@ -35,11 +34,13 @@ impl MemoryPool {
             pools: std::array::from_fn(|_| Vec::new()),
         }
     }
-    
+
     fn get_pool_index(&self, size: usize) -> Option<usize> {
-        SIZE_CLASSES.iter().position(|&class_size| size <= class_size)
+        SIZE_CLASSES
+            .iter()
+            .position(|&class_size| size <= class_size)
     }
-    
+
     unsafe fn alloc(&mut self, size: usize) -> Option<NonNull<u8>> {
         if let Some(pool_idx) = self.get_pool_index(size) {
             if let Some(ptr) = self.pools[pool_idx].pop() {
@@ -48,7 +49,7 @@ impl MemoryPool {
         }
         None
     }
-    
+
     unsafe fn dealloc(&mut self, ptr: NonNull<u8>, size: usize) {
         if let Some(pool_idx) = self.get_pool_index(size) {
             // Limit pool size to prevent memory bloat
@@ -66,8 +67,7 @@ impl MemoryPool {
 // Cache-line aware atomic operations
 #[repr(align(64))]
 struct AtomicCounter {
-    value: AtomicUsize,
-    _padding: [u8; 64 - 8],
+    _padding: [u8; 64],
 }
 
 #[repr(C, align(64))]
@@ -182,19 +182,12 @@ impl Arena {
     pub fn with_capacity(bytes: usize) -> Self {
         assert!(bytes > 0);
         // For compatibility with tests, use exact capacity for small sizes
-        let capacity = if bytes < MIN_CHUNK_SIZE {
-            (bytes + ALIGNMENT_MASK) & !ALIGNMENT_MASK // Round up to alignment but don't force MIN_CHUNK_SIZE
-        } else {
-            (bytes + ALIGNMENT_MASK) & !ALIGNMENT_MASK
-        };
+        let capacity = (bytes + ALIGNMENT_MASK) & !ALIGNMENT_MASK;
         let first_chunk = unsafe { allocate_chunk(capacity) };
         let inner = ArenaInner {
             chunks: vec![first_chunk],
             current_chunk: AtomicUsize::new(0),
-            total_allocated: AtomicCounter {
-                value: AtomicUsize::new(0),
-                _padding: [0; 64 - 8],
-            },
+            total_allocated: AtomicCounter { _padding: [0; 64] },
             _padding: [0; 64 - 2 * 8 - 8],
         };
         Arena {
@@ -218,10 +211,10 @@ impl Arena {
             layout.align(),
             CHUNK_ALIGN
         );
-        
+
         let size = layout.size();
         let align = layout.align();
-        
+
         if size == 0 {
             #[cfg(feature = "stats")]
             self.stats.allocation_count.fetch_add(1, Ordering::Relaxed);
@@ -240,23 +233,22 @@ impl Arena {
             let inner = &mut *self.inner.get();
             let current_chunk_idx = inner.current_chunk.load(Ordering::Acquire);
             let chunk = &mut inner.chunks[current_chunk_idx];
-            
+
             // Prefetch the chunk data for better cache performance
             self.prefetch(chunk.ptr.as_ptr());
-            
+
             // Atomic compare-and-swap for allocation
             let current = chunk.used.load(Ordering::Acquire);
             let aligned = (current + align - 1) & !(align - 1);
             let end = aligned + size;
-            
+
             if likely(end <= chunk.capacity) {
                 // Try to atomically claim the space
-                if chunk.used.compare_exchange_weak(
-                    current, 
-                    end, 
-                    Ordering::Release, 
-                    Ordering::Relaxed
-                ).is_ok() {
+                if chunk
+                    .used
+                    .compare_exchange_weak(current, end, Ordering::Release, Ordering::Relaxed)
+                    .is_ok()
+                {
                     self.record_allocation(end - current);
                     return chunk.ptr.as_ptr().add(aligned);
                 }
@@ -264,23 +256,22 @@ impl Arena {
                 let current = chunk.used.load(Ordering::Acquire);
                 let aligned = (current + align - 1) & !(align - 1);
                 let end = aligned + size;
-                if end <= chunk.capacity && 
-                   chunk.used.compare_exchange_weak(
-                       current, 
-                       end, 
-                       Ordering::Release, 
-                       Ordering::Relaxed
-                   ).is_ok() {
+                if end <= chunk.capacity
+                    && chunk
+                        .used
+                        .compare_exchange_weak(current, end, Ordering::Release, Ordering::Relaxed)
+                        .is_ok()
+                {
                     self.record_allocation(end - current);
                     return chunk.ptr.as_ptr().add(aligned);
                 }
             }
-            
+
             // Slow path: need new chunk
             self.allocate_new_chunk(&layout)
         }
     }
-    
+
     #[inline]
     unsafe fn try_pool_alloc(&self, size: usize, align: usize) -> Option<*mut u8> {
         let pool = &mut *self.memory_pool.get();
@@ -293,13 +284,13 @@ impl Arena {
                 pool.dealloc(ptr, size);
                 return None;
             }
-            
+
             self.record_allocation(size);
             return Some(ptr.as_ptr());
         }
         None
     }
-    
+
     /// Prefetch memory for better cache performance
     #[inline]
     #[cfg(target_arch = "x86_64")]
@@ -308,13 +299,13 @@ impl Arena {
             _mm_prefetch(addr as *const i8, _MM_HINT_T0);
         }
     }
-    
+
     #[cfg(not(target_arch = "x86_64"))]
     #[inline]
     unsafe fn prefetch(&self, _addr: *const u8) {
         // No prefetch on non-x86_64 architectures
     }
-    
+
     #[cold]
     #[inline(never)]
     unsafe fn allocate_new_chunk(&self, layout: &Layout) -> *mut u8 {
@@ -322,13 +313,13 @@ impl Arena {
         let new_capacity = next_chunk_capacity_optimized(
             inner.chunks[inner.current_chunk.load(Ordering::Acquire)].capacity,
             layout.size(),
-            layout.align()
+            layout.align(),
         );
         let new_chunk = allocate_chunk(new_capacity);
         let new_chunk_idx = inner.chunks.len();
         inner.chunks.push(new_chunk);
         inner.current_chunk.store(new_chunk_idx, Ordering::Release);
-        
+
         // Allocate from new chunk
         let chunk = &mut inner.chunks[new_chunk_idx];
         let aligned = 0usize; // Start of new chunk is already aligned
@@ -351,6 +342,7 @@ impl Arena {
     /// *x = 7;
     /// ```
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc<T>(&self, value: T) -> &mut T {
         let layout = Layout::new::<T>();
         unsafe {
@@ -359,7 +351,7 @@ impl Arena {
             &mut *ptr
         }
     }
-    
+
     /// Allocates space for a default-initialized value in the arena.
     ///
     /// Returns a mutable reference to the newly allocated value.
@@ -367,9 +359,10 @@ impl Arena {
     pub fn alloc_default<T: Default>(&self) -> &mut T {
         self.alloc(T::default())
     }
-    
+
     /// Optimized allocation for common small types
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc_u8(&self, value: u8) -> &mut u8 {
         let layout = Layout::from_size_align(1, 1).unwrap();
         unsafe {
@@ -378,8 +371,9 @@ impl Arena {
             &mut *ptr
         }
     }
-    
+
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc_u32(&self, value: u32) -> &mut u32 {
         let layout = Layout::from_size_align(4, 4).unwrap();
         unsafe {
@@ -388,8 +382,9 @@ impl Arena {
             &mut *ptr
         }
     }
-    
+
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc_u64(&self, value: u64) -> &mut u64 {
         let layout = Layout::from_size_align(8, 8).unwrap();
         unsafe {
@@ -408,13 +403,13 @@ impl Arena {
             self.record_allocation(0);
             return unsafe { slice::from_raw_parts(NonNull::<T>::dangling().as_ptr(), 0) };
         }
-        
+
         let len = slice.len();
         let layout = Layout::array::<T>(len).unwrap();
         unsafe {
             let ptr = self.allocate_raw(layout).cast::<T>();
             // Use optimized copy for large slices
-            let total_bytes = len * mem::size_of::<T>();
+            let total_bytes = std::mem::size_of_val(slice);
             if total_bytes >= SIMD_THRESHOLD && cfg!(target_arch = "x86_64") {
                 self.copy_large_slice_optimized(slice.as_ptr(), ptr, len, total_bytes);
             } else {
@@ -423,37 +418,43 @@ impl Arena {
             slice::from_raw_parts(ptr, len)
         }
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx2")]
-    unsafe fn copy_large_slice_optimized<T: Copy>(&self, src: *const T, dst: *mut T, len: usize, total_bytes: usize) {
+    unsafe fn copy_large_slice_optimized<T: Copy>(
+        &self,
+        src: *const T,
+        dst: *mut T,
+        len: usize,
+        total_bytes: usize,
+    ) {
         if mem::size_of::<T>() == 1 && is_x86_feature_detected!("avx2") {
             // Aggressive SIMD for byte arrays
             let src_bytes = src as *const u8;
             let dst_bytes = dst as *mut u8;
-            
+
             // Use 256-bit (32-byte) vectors for maximum throughput
             let vectors = total_bytes / 32;
             let remaining = total_bytes % 32;
-            
+
             // Prefetch first few cache lines
             for i in 0..4.min(vectors) {
                 if i * 32 < total_bytes {
                     _mm_prefetch(src_bytes.add(i * 32) as *const i8, _MM_HINT_T0);
                 }
             }
-            
+
             // Vectorized copy loop
             for i in 0..vectors {
                 // Prefetch ahead
                 if i + 4 < vectors {
                     _mm_prefetch(src_bytes.add((i + 4) * 32) as *const i8, _MM_HINT_T0);
                 }
-                
+
                 let data = _mm256_loadu_si256(src_bytes.add(i * 32) as *const __m256i);
                 _mm256_storeu_si256(dst_bytes.add(i * 32) as *mut __m256i, data);
             }
-            
+
             // Handle remaining bytes
             for j in 0..remaining {
                 *dst_bytes.add(vectors * 32 + j) = *src_bytes.add(vectors * 32 + j);
@@ -463,22 +464,29 @@ impl Arena {
             let elements_per_vector = 8;
             let vectors = len / elements_per_vector;
             let remaining = len % elements_per_vector;
-            
+
             for i in 0..vectors {
                 let data = _mm256_loadu_si256(src.add(i * elements_per_vector) as *const __m256i);
                 _mm256_storeu_si256(dst.add(i * elements_per_vector) as *mut __m256i, data);
             }
-            
+
             for j in 0..remaining {
-                *dst.add(vectors * elements_per_vector + j) = *src.add(vectors * elements_per_vector + j);
+                *dst.add(vectors * elements_per_vector + j) =
+                    *src.add(vectors * elements_per_vector + j);
             }
         } else {
             ptr::copy_nonoverlapping(src, dst, len);
         }
     }
-    
+
     #[cfg(not(target_arch = "x86_64"))]
-    unsafe fn copy_large_slice_optimized<T: Copy>(&self, src: *const T, dst: *mut T, len: usize, _total_bytes: usize) {
+    unsafe fn copy_large_slice_optimized<T: Copy>(
+        &self,
+        src: *const T,
+        dst: *mut T,
+        len: usize,
+        _total_bytes: usize,
+    ) {
         ptr::copy_nonoverlapping(src, dst, len);
     }
 
@@ -520,7 +528,7 @@ impl Arena {
                 let idx = inner.current_chunk.load(Ordering::Acquire);
                 (idx, inner.chunks[idx].used.load(Ordering::Acquire))
             };
-            
+
             #[cfg(feature = "stats")]
             let start_bytes_used = self.stats.bytes_used.load(Ordering::Acquire);
             #[cfg(feature = "stats")]
@@ -535,8 +543,12 @@ impl Arena {
 
             #[cfg(feature = "stats")]
             {
-                self.stats.bytes_used.store(start_bytes_used, Ordering::Release);
-                self.stats.allocation_count.store(start_allocation_count, Ordering::Release);
+                self.stats
+                    .bytes_used
+                    .store(start_bytes_used, Ordering::Release);
+                self.stats
+                    .allocation_count
+                    .store(start_allocation_count, Ordering::Release);
             }
 
             let inner = &mut *self.inner.get();
@@ -569,7 +581,7 @@ impl Arena {
             chunk.used.store(0, Ordering::Release);
         }
         inner.current_chunk.store(0, Ordering::Release);
-        
+
         #[cfg(feature = "stats")]
         {
             self.stats.bytes_used.store(0, Ordering::Release);
@@ -586,7 +598,7 @@ impl Arena {
             }
             self.stats.allocation_count.fetch_add(1, Ordering::Relaxed);
         }
-        
+
         #[cfg(not(feature = "stats"))]
         let _ = size;
     }
@@ -596,7 +608,7 @@ impl Arena {
     pub fn stats(&self) -> ArenaStats {
         let inner = unsafe { &*self.inner.get() };
         let total_capacity: usize = inner.chunks.iter().map(|c| c.capacity).sum();
-        
+
         #[cfg(feature = "stats")]
         {
             ArenaStats {
@@ -606,10 +618,14 @@ impl Arena {
                 chunk_count: inner.chunks.len(),
             }
         }
-        
+
         #[cfg(not(feature = "stats"))]
         {
-            let bytes_used = inner.chunks.iter().map(|c| c.used.load(Ordering::Relaxed)).sum();
+            let bytes_used = inner
+                .chunks
+                .iter()
+                .map(|c| c.used.load(Ordering::Relaxed))
+                .sum();
             ArenaStats {
                 bytes_allocated: total_capacity,
                 bytes_used,
@@ -624,11 +640,13 @@ impl Arena {
     pub fn bytes_allocated(&self) -> usize {
         #[cfg(feature = "stats")]
         return self.stats.bytes_used.load(Ordering::Relaxed);
-        
+
         #[cfg(not(feature = "stats"))]
         {
             let inner = unsafe { &*self.inner.get() };
-            inner.chunks[inner.current_chunk.load(Ordering::Acquire)].used.load(Ordering::Relaxed)
+            inner.chunks[inner.current_chunk.load(Ordering::Acquire)]
+                .used
+                .load(Ordering::Relaxed)
         }
     }
 }
@@ -663,22 +681,18 @@ unsafe fn allocate_chunk(capacity: usize) -> Chunk {
 
 fn next_chunk_capacity_optimized(prev_capacity: usize, size: usize, align: usize) -> usize {
     let min_needed = size + align - 1;
-    
+
     // Exponential growth with reasonable bounds
     let mut capacity = prev_capacity.saturating_mul(2);
-    
+
     // Ensure we have enough for this allocation
     if capacity < min_needed {
         capacity = min_needed;
     }
-    
+
     // Apply reasonable bounds
-    if capacity < MIN_CHUNK_SIZE {
-        capacity = MIN_CHUNK_SIZE;
-    } else if capacity > MAX_CHUNK_SIZE {
-        capacity = MAX_CHUNK_SIZE;
-    }
-    
+    capacity = capacity.clamp(MIN_CHUNK_SIZE, MAX_CHUNK_SIZE);
+
     // Round up to nearest multiple of CHUNK_ALIGN for better alignment
     (capacity + ALIGNMENT_MASK) & !ALIGNMENT_MASK
 }
