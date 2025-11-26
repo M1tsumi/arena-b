@@ -12,11 +12,6 @@ use std::vec::Vec;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-#[cfg(target_arch = "aarch64")]
-use std::arch::aarch64::*;
-#[cfg(target_arch = "aarch64")]
-use std::detect::is_aarch64_feature_detected;
-
 const CHUNK_ALIGN: usize = 64;
 const DEFAULT_CHUNK_SIZE: usize = 64 * 1024;
 const MIN_CHUNK_SIZE: usize = 4096;
@@ -317,8 +312,7 @@ impl Arena {
     #[inline]
     #[cfg(target_arch = "aarch64")]
     unsafe fn prefetch(&self, addr: *const u8) {
-        // For now, use a simple prefetch implementation for aarch64
-        // The stdarch prefetch functions are still unstable
+        // Simple prefetch for aarch64 without feature detection
         for i in 0..PREFETCH_WARMUP_SIZE {
             let prefetch_addr = addr.add(i * 64);
             // Simple memory read to trigger cache loading
@@ -681,7 +675,6 @@ impl Arena {
     }
 
     #[cfg(target_arch = "aarch64")]
-    #[target_feature(enable = "neon")]
     unsafe fn copy_large_slice_optimized<T: Copy>(
         &self,
         src: *const T,
@@ -689,25 +682,9 @@ impl Arena {
         len: usize,
         _total_bytes: usize,
     ) {
-        if mem::size_of::<T>() == 1 && is_aarch64_feature_detected!("neon") {
-            // Use NEON for byte copying
-            let elements_per_vector = 16; // 128-bit vector
-            let vectors = len / elements_per_vector;
-            let remaining = len % elements_per_vector;
-
-            for i in 0..vectors {
-                let src_ptr = src.add(i * elements_per_vector) as *const std::arch::aarch64::uint8x16_t;
-                let dst_ptr = dst.add(i * elements_per_vector) as *mut std::arch::aarch64::uint8x16_t;
-                *dst_ptr = std::arch::aarch64::vld1q_u8(src_ptr);
-            }
-
-            for j in 0..remaining {
-                *dst.add(vectors * elements_per_vector + j) =
-                    *src.add(vectors * elements_per_vector + j);
-            }
-        } else {
-            ptr::copy_nonoverlapping(src, dst, len);
-        }
+        // Use standard copy for aarch64 to avoid NEON intrinsics
+        // This still provides good performance on ARM64
+        ptr::copy_nonoverlapping(src, dst, len);
     }
 
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
