@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.1] - Cross-Platform Compatibility Release
+
+### 🛠️ Platform Compatibility
+
+- **Cross-Platform Build**: Verified builds on Ubuntu, Windows, and macOS
+- **CI Workflow Fixes**: Fixed toolchain interpolation issues in GitHub Actions
+- **Code Formatting**: Applied consistent formatting across all files
+- **Architecture Support**: Maintained x86_64 optimizations with fallback for other architectures
+
+### 🔧 Technical Improvements
+
+- **Fixed CI Pipeline**: Resolved toolchain input handling in GitHub Actions
+- **Formatting Consistency**: Applied `cargo fmt` to ensure consistent code style
+- **Benchmarks Validation**: Confirmed all benchmarks work across platforms
+- **Zero Clippy Warnings**: Maintained zero lint warnings across all platforms
+
+### ✅ Quality Assurance
+
+- **All Tests Pass**: Verified on Windows, Ubuntu, and macOS
+- **No Breaking Changes**: 100% compatible with v0.4.0
+- **Performance Maintained**: All v0.4.0 performance improvements intact
+- **Documentation Updated**: All docs reflect current state
+
 ## [0.4.0] - Major Performance Release
 
 ### 🚀 Performance Improvements
