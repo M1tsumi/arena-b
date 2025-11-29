@@ -281,40 +281,6 @@ where
     }
 }
 
-    /// Panics if `bytes` is zero or if the allocation fails.
-    #[inline]
-    pub fn with_capacity(bytes: usize) -> Self {
-        assert!(bytes > 0);
-        // For compatibility with tests, use exact capacity for small sizes
-        let capacity = (bytes + ALIGNMENT_MASK) & !ALIGNMENT_MASK;
-        let first_chunk = unsafe { allocate_chunk(capacity) };
-        let inner = ArenaInner {
-            chunks: vec![first_chunk],
-            current_chunk: AtomicUsize::new(0),
-            total_allocated: AtomicCounter { _padding: [0; 64] },
-            checkpoints: Vec::new(), // v0.5.0: Initialize checkpoints
-            #[cfg(feature = "debug")]
-            current_checkpoint_id: 1, // v0.5.0: Start with checkpoint ID 1
-            #[cfg(feature = "virtual_memory")]
-            virtual_chunk: None, // v0.5.0: Initialize virtual chunk as None
-            #[cfg(feature = "lockfree")]
-            lockfree_buffer: Some(lockfree::LockFreeBuffer::new(4096)), // v0.5.0: Initialize lock-free buffer
-            _padding: [0; 64 - 2 * 8 - 8 - 8],
-        };
-        Arena {
-            inner: UnsafeCell::new(inner),
-            #[cfg(feature = "stats")]
-            stats: AtomicStats {
-                bytes_used: AtomicUsize::new(0),
-                allocation_count: AtomicUsize::new(0),
-                _padding: [0; 64 - 2 * 8],
-            },
-            #[cfg(feature = "lockfree")]
-            lockfree_stats: lockfree::LockFreeStats::new(), // v0.5.0: Initialize lock-free stats
-            memory_pool: UnsafeCell::new(MemoryPool::new()),
-            _padding: [0; 64],
-        }
-    }
 /// Statistics for pool usage
 #[derive(Debug, Clone)]
 pub struct PoolStats {
@@ -466,13 +432,13 @@ impl SyncArena {
 
     pub fn with_capacity(bytes: usize) -> Self {
         SyncArena {
-            inner: Mutex::new(Arena::with_capacity(bytes)),
+            inner: Mutex::new(Arena::with_capacity(bytes).expect("Failed to create arena")),
         }
     }
 
     pub fn scope<F, R>(&self, f: F) -> R
     where
-        F: for<'scope, 'arena> FnOnce(&Scope<'scope, 'arena>) -> R,
+        F: for<'scope, 'arena> FnOnce(&crate::arena::Scope<'scope, 'arena>) -> R,
     {
         let guard = self.inner.lock().unwrap();
         guard.scope(f)
@@ -507,12 +473,12 @@ impl ArenaBuilder {
 
     pub fn build(self) -> Arena {
         let capacity = if self.initial_capacity == 0 {
-            Arena::DEFAULT_CAPACITY
+            DEFAULT_CHUNK_SIZE
         } else {
             self.initial_capacity
         };
 
         // thread_safe is currently ignored; a non-thread-safe Arena is always built.
-        Arena::with_capacity(capacity)
+        Arena::with_capacity(capacity).expect("Failed to create arena")
     }
 }

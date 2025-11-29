@@ -10,12 +10,19 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use alloc::collections::Vec;
 use alloc::vec::Vec;
 use alloc::sync::Mutex;
+use std::sync::MutexGuard;
 
 // Re-export core functionality
 pub use crate::core::{
     ArenaCheckpoint, ArenaStats, DebugStats, ArenaBuilder, Scope,
-    MemoryPool, Chunk, VirtualChunk,
+    MemoryPool, Chunk, VirtualChunk, AtomicCounter,
 };
+
+// Import specific types from core
+use crate::core::{ArenaInner, AtomicStats};
+
+// Import constants from lib.rs
+use crate::{MIN_CHUNK_SIZE, MAX_CHUNK_SIZE, DEFAULT_CHUNK_SIZE};
 
 // Re-export feature modules
 #[cfg(feature = "virtual_memory")]
@@ -32,12 +39,12 @@ pub use crate::debug::{DEBUG_STATE, AllocationInfo, GUARD_MAGIC, FREED_MAGIC};
 
 // Main Arena struct moved from lib.rs
 pub struct Arena {
-    inner: UnsafeCell<crate::core::ArenaInner>,
+    inner: UnsafeCell<ArenaInner>,
     #[cfg(feature = "stats")]
-    stats: crate::core::AtomicStats,
+    stats: AtomicStats,
     #[cfg(feature = "lockfree")]
-    lockfree_stats: crate::lockfree::LockFreeStats,
-    memory_pool: UnsafeCell<crate::core::MemoryPool>,
+    lockfree_stats: LockFreeStats,
+    memory_pool: UnsafeCell<MemoryPool>,
     _padding: [u8; 64], // Cache line padding to avoid false sharing
 }
 
@@ -51,6 +58,43 @@ pub struct ArenaBuilder {
 pub struct Scope<'scope, 'arena> {
     arena: &'arena Arena,
     _marker: PhantomData<&'scope mut ()>,
+}
+
+impl<'scope, 'arena> Scope<'scope, 'arena> {
+    pub fn new(arena: &'arena Arena) -> Self {
+        Self {
+            arena,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn alloc<T>(&self, value: T) -> &'scope mut T {
+        self.arena.alloc(value)
+    }
+
+    pub fn alloc_str(&self, s: &str) -> &'scope mut str {
+        self.arena.alloc_str(s)
+    }
+
+    pub fn alloc_slice_copy<T: Copy>(&self, slice: &[T]) -> &'scope mut [T] {
+        self.arena.alloc_slice_copy(slice)
+    }
+
+    pub fn alloc_slice_uninit<T>(&self, len: usize) -> &'scope mut [MaybeUninit<T>] {
+        self.arena.alloc_slice_uninit(len)
+    }
+
+    pub fn checkpoint(&self) -> ArenaCheckpoint {
+        self.arena.checkpoint()
+    }
+
+    pub unsafe fn rewind_to_checkpoint(&self, checkpoint: ArenaCheckpoint) {
+        self.arena.rewind_to_checkpoint(checkpoint);
+    }
+
+    pub fn reset(&self) {
+        unsafe { self.arena.reset() };
+    }
 }
 #[cfg(feature = "debug")]
 pub use crate::debug::DebugAllocator;
@@ -81,21 +125,53 @@ unsafe impl Sync for Arena {}
 impl Arena {
     /// Create a new arena with default capacity
     pub fn new() -> Self {
-        Self::with_capacity(4096).expect("Failed to create arena")
+        Self::with_capacity(DEFAULT_CHUNK_SIZE).expect("Failed to create arena")
     }
 
     /// Create a new arena with specified initial capacity
     pub fn with_capacity(capacity: usize) -> Result<Self, &'static str> {
-        let inner = crate::core::ArenaInner::new(capacity)?;
+        let mut capacity = capacity.max(MIN_CHUNK_SIZE);
+        while capacity < MIN_CHUNK_SIZE && capacity < MAX_CHUNK_SIZE {
+            capacity *= 2;
+        }
+        capacity = capacity.max(MIN_CHUNK_SIZE).min(MAX_CHUNK_SIZE);
+
+        let chunk = Chunk::new(capacity).map_err(|_| "Failed to allocate chunk")?;
+        let checkpoint = ArenaCheckpoint {
+            chunk_index: 0,
+            chunk_offset: 0,
+            allocation_count: 0,
+            bytes_used: 0,
+            #[cfg(feature = "debug")]
+            checkpoint_id: 1,
+        };
+
+        let inner = ArenaInner {
+            chunks: vec![chunk],
+            current_chunk: AtomicUsize::new(0),
+            total_allocated: AtomicCounter { _padding: [0; 64] },
+            checkpoints: vec![checkpoint],
+            #[cfg(feature = "debug")]
+            current_checkpoint_id: 1,
+            #[cfg(feature = "virtual_memory")]
+            virtual_chunk: None,
+            #[cfg(feature = "lockfree")]
+            lockfree_buffer: None,
+            _padding: [0; 64 - 2 * 8 - 8 - 8],
+        };
         
         Ok(Self {
             inner: UnsafeCell::new(inner),
-            #[cfg(feature = "debug")]
-            debug_allocator: DebugAllocator::new(),
-            #[cfg(feature = "thread_local")]
-            thread_cache: ThreadLocalCache::new(0), // Will be set later
+            #[cfg(feature = "stats")]
+            stats: AtomicStats {
+                bytes_used: AtomicUsize::new(0),
+                allocation_count: AtomicUsize::new(0),
+                _padding: [0; 64 - 2 * 8],
+            },
             #[cfg(feature = "lockfree")]
             lockfree_stats: LockFreeStats::new(),
+            memory_pool: UnsafeCell::new(MemoryPool::new()),
+            _padding: [0; 64],
         })
     }
 
