@@ -130,7 +130,11 @@ mod virtual_memory {
 
                 #[cfg(unix)]
                 {
-                    libc::mprotect(self.ptr.add(offset) as *mut libc::c_void, decommit_size, libc::PROT_NONE);
+                    libc::mprotect(
+                        self.ptr.add(offset) as *mut libc::c_void,
+                        decommit_size,
+                        libc::PROT_NONE,
+                    );
                 }
             }
         }
@@ -498,10 +502,7 @@ mod debug {
             size: usize,
             checkpoint_id: u64,
         ) {
-            let arena_allocations = self
-                .allocations
-                .entry(arena_id)
-                .or_default();
+            let arena_allocations = self.allocations.entry(arena_id).or_default();
             let info = AllocationInfo {
                 ptr,
                 size,
