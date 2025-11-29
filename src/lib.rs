@@ -122,7 +122,7 @@ mod virtual_memory {
                 #[cfg(unix)]
                 {
                     let result = libc::mprotect(
-                        self.ptr.add(self.committed_size),
+                        self.ptr.add(self.committed_size) as *mut libc::c_void,
                         commit_size,
                         libc::PROT_READ | libc::PROT_WRITE,
                     );
@@ -150,7 +150,11 @@ mod virtual_memory {
 
                 #[cfg(unix)]
                 {
-                    libc::mprotect(self.ptr.add(offset), decommit_size, libc::PROT_NONE);
+                    libc::mprotect(
+                        self.ptr.add(offset) as *mut libc::c_void,
+                        decommit_size,
+                        libc::PROT_NONE,
+                    );
                 }
             }
         }
