@@ -18,13 +18,18 @@ use std::arch::x86_64::*;
 mod virtual_memory {
 
     const PAGE_SIZE: usize = 4096;
+    #[allow(dead_code)]
     const DEFAULT_RESERVE_SIZE: usize = 16 * 1024 * 1024; // 16MB
+    #[allow(dead_code)]
     const DEFAULT_COMMIT_SIZE: usize = 64 * 1024; // 64KB
 
     // Virtual memory region using reserve/commit pattern
+    #[allow(dead_code)]
     pub struct VirtualMemoryRegion {
         pub ptr: *mut u8,
+        #[allow(dead_code)]
         pub reserved_size: usize,
+        #[allow(dead_code)]
         pub committed_size: usize,
     }
 
@@ -35,9 +40,8 @@ mod virtual_memory {
             let ptr = unsafe {
                 #[cfg(windows)]
                 {
-                    use std::os::windows::io::AsRawHandle;
                     use windows_sys::Win32::System::Memory::{
-                        VirtualAlloc, MEM_COMMIT, MEM_RESERVE, PAGE_READWRITE,
+                        VirtualAlloc, MEM_RESERVE, PAGE_READWRITE,
                     };
 
                     VirtualAlloc(
@@ -72,6 +76,7 @@ mod virtual_memory {
             })
         }
 
+        #[allow(dead_code)]
         pub fn commit(&mut self, size: usize) -> Result<*mut u8, &'static str> {
             let commit_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
             let new_committed = self.committed_size + commit_size;
@@ -117,6 +122,7 @@ mod virtual_memory {
             unsafe { Ok(self.ptr.add(self.committed_size - commit_size)) }
         }
 
+        #[allow(dead_code)]
         pub fn decommit(&mut self, offset: usize, size: usize) {
             let decommit_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
 
@@ -139,6 +145,7 @@ mod virtual_memory {
             }
         }
 
+        #[allow(dead_code)]
         pub fn reset(&mut self) {
             if self.committed_size > 0 {
                 self.decommit(0, self.committed_size);
@@ -314,6 +321,7 @@ mod thread_local_cache {
         });
     }
 
+    #[allow(dead_code)]
     pub fn clear_thread_cache() {
         THREAD_CACHE.with(|cache| {
             cache.borrow_mut().reset();
@@ -378,6 +386,7 @@ mod lockfree {
             self.used.store(0, Ordering::Release);
         }
 
+        #[allow(dead_code)]
         pub fn is_full(&self, size: usize, align: usize) -> bool {
             let current = self.used.load(Ordering::Acquire);
             let aligned = (current + align - 1) & !(align - 1);
@@ -463,8 +472,11 @@ mod debug {
 
     // Debug allocation metadata
     #[derive(Debug, Clone)]
+    #[allow(dead_code)]
     pub struct AllocationInfo {
+        #[allow(dead_code)]
         pub ptr: *mut u8,
+        #[allow(dead_code)]
         pub size: usize,
         pub checkpoint_id: u64,
         pub magic: u64,
@@ -635,6 +647,7 @@ struct AtomicCounter {
 // v0.5.0: Debug guard structures
 #[cfg(feature = "debug")]
 #[repr(C)]
+#[allow(dead_code)]
 struct DebugGuard {
     magic_before: u64,
     ptr: *mut u8,
@@ -645,6 +658,7 @@ struct DebugGuard {
 
 #[cfg(feature = "debug")]
 impl DebugGuard {
+    #[allow(dead_code)]
     fn new(ptr: *mut u8, size: usize, checkpoint_id: u64) -> Self {
         Self {
             magic_before: debug::GUARD_MAGIC,
@@ -655,6 +669,7 @@ impl DebugGuard {
         }
     }
 
+    #[allow(dead_code)]
     fn validate(&self) -> Result<(), String> {
         if self.magic_before != debug::GUARD_MAGIC || self.magic_after != debug::GUARD_MAGIC {
             Err("Debug guard corruption detected".to_string())
@@ -694,6 +709,7 @@ impl VirtualChunk {
         })
     }
 
+    #[allow(dead_code)]
     unsafe fn allocate(&self, size: usize, align: usize) -> Option<*mut u8> {
         let current = self.used.load(Ordering::Acquire);
         let aligned = (current + align - 1) & !(align - 1);
@@ -721,6 +737,7 @@ impl VirtualChunk {
         None
     }
 
+    #[allow(dead_code)]
     fn reset(&self) {
         let region = unsafe { &mut *self.region.get() };
         region.reset();
