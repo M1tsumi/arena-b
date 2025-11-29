@@ -142,7 +142,14 @@ impl VirtualMemoryRegion {
                 }
                 
                 // Also discard the pages to free physical memory
-                libc::madvice(decommit_ptr, size, libc::MADV_DONTNEED);
+                #[cfg(target_os = "macos")]
+                {
+                    libc::madvice(decommit_ptr, size, libc::MADV_FREE);
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    libc::madvice(decommit_ptr, size, libc::MADV_DONTNEED);
+                }
             }
         }
 

@@ -29,7 +29,6 @@ proptest = "1.4"
 [features]
 default = ["stats"]
 stats = []
-debug = []
 virtual_memory = []
 thread_local = []
 lockfree = []
