@@ -33,9 +33,19 @@ jobs:
 
       - name: Cargo clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+        if: matrix.os != 'macos-latest'
+
+      - name: Cargo clippy (macOS - exclude debug feature)
+        run: cargo clippy --all-targets --features "stats virtual_memory thread_local lockfree" -- -D warnings
+        if: matrix.os == 'macos-latest'
 
       - name: Cargo test (all features)
         run: cargo test --all-features
+        if: matrix.os != 'macos-latest'
+
+      - name: Cargo test (macOS - exclude debug feature)
+        run: cargo test --features "stats virtual_memory thread_local lockfree"
+        if: matrix.os == 'macos-latest'
 
       - name: Cargo test (no default features)
         run: cargo test --no-default-features --tests

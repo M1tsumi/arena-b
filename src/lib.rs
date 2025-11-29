@@ -1707,18 +1707,14 @@ impl Arena {
             }
         }
 
-        // TODO: Debug state clearing disabled due to macOS alignment issues
-        // The debug tracking system causes pointer alignment violations on macOS
-        // when clearing HashMap entries with pointer keys during arena reset
-        // #[cfg(feature = "debug")]
-        // {
-        //     let arena_id = self as *const Arena as usize;
-        //     let mut debug_state = debug::DEBUG_STATE.write().unwrap();
-        //     if let Some(arena_allocations) = debug_state.allocations.get_mut(&arena_id) {
-        //         arena_allocations.clear();
-        //     }
-        //     debug_state.current_checkpoint_ids.remove(&arena_id);
-        // }
+        // v0.5.0: Clear debug state on full reset
+        #[cfg(feature = "debug")]
+        {
+            let arena_id = self as *const Arena as usize;
+            let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+            debug_state.allocations.remove(&arena_id);
+            debug_state.current_checkpoint_ids.remove(&arena_id);
+        }
     }
 
     #[inline]
