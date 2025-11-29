@@ -18,6 +18,40 @@ pub use crate::core::{
 };
 
 // Re-export feature modules
+#[cfg(feature = "virtual_memory")]
+pub use crate::virtual_memory::VirtualMemoryRegion;
+
+#[cfg(feature = "thread_local")]
+pub use crate::thread_local::*;
+
+#[cfg(feature = "lockfree")]
+pub use crate::lockfree::{LockFreeBuffer, LockFreeStats};
+
+#[cfg(feature = "debug")]
+pub use crate::debug::{DEBUG_STATE, AllocationInfo, GUARD_MAGIC, FREED_MAGIC};
+
+// Main Arena struct moved from lib.rs
+pub struct Arena {
+    inner: UnsafeCell<crate::core::ArenaInner>,
+    #[cfg(feature = "stats")]
+    stats: crate::core::AtomicStats,
+    #[cfg(feature = "lockfree")]
+    lockfree_stats: crate::lockfree::LockFreeStats,
+    memory_pool: UnsafeCell<crate::core::MemoryPool>,
+    _padding: [u8; 64], // Cache line padding to avoid false sharing
+}
+
+/// v0.5.0: Arena builder for customizing arena creation
+pub struct ArenaBuilder {
+    initial_capacity: usize,
+    chunk_size: usize,
+    thread_safe: bool,
+}
+
+pub struct Scope<'scope, 'arena> {
+    arena: &'arena Arena,
+    _marker: PhantomData<&'scope mut ()>,
+}
 #[cfg(feature = "debug")]
 pub use crate::debug::DebugAllocator;
 
