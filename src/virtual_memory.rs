@@ -1,0 +1,254 @@
+//! Virtual memory strategy for large arena allocations
+
+use alloc::alloc::{alloc, dealloc, Layout};
+use core::ptr;
+
+#[cfg(windows)]
+use core::ffi::OsStrExt;
+
+const PAGE_SIZE: usize = 4096;
+const DEFAULT_RESERVE_SIZE: usize = 16 * 1024 * 1024; // 16MB
+const DEFAULT_COMMIT_SIZE: usize = 64 * 1024; // 64KB
+
+// Virtual memory region using reserve/commit pattern
+pub struct VirtualMemoryRegion {
+    pub ptr: *mut u8,
+    pub reserved_size: usize,
+    pub committed_size: usize,
+}
+
+impl VirtualMemoryRegion {
+    pub fn new(reserve_size: usize) -> Result<Self, &'static str> {
+        let reserve_size = (reserve_size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+
+        let ptr = unsafe {
+            #[cfg(windows)]
+            {
+                use windows_sys::Win32::System::Memory::{
+                    VirtualAlloc, MEM_RESERVE, PAGE_READWRITE
+                };
+                VirtualAlloc(
+                    ptr::null_mut(),
+                    reserve_size,
+                    MEM_RESERVE,
+                    PAGE_READWRITE,
+                )
+            }
+            #[cfg(unix)]
+            {
+                libc::mmap(
+                    ptr::null_mut(),
+                    reserve_size,
+                    libc::PROT_NONE,
+                    libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+                    -1,
+                    0,
+                )
+            }
+        };
+
+        if ptr.is_null() {
+            return Err("Failed to reserve virtual memory");
+        }
+
+        Ok(Self {
+            ptr: ptr as *mut u8,
+            reserved_size: reserve_size,
+            committed_size: 0,
+        })
+    }
+
+    pub fn commit(&mut self, offset: usize, size: usize) -> Result<(), &'static str> {
+        let offset = (offset + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let end = offset + size;
+
+        if end > self.reserved_size {
+            return Err("Commit size exceeds reserved size");
+        }
+
+        let commit_ptr = unsafe {
+            self.ptr.add(offset)
+        };
+
+        unsafe {
+            #[cfg(windows)]
+            {
+                use windows_sys::Win32::System::Memory::{
+                    VirtualAlloc, MEM_COMMIT, PAGE_READWRITE
+                };
+                let result = VirtualAlloc(
+                    commit_ptr as *mut _,
+                    size,
+                    MEM_COMMIT,
+                    PAGE_READWRITE,
+                );
+                if result.is_null() {
+                    return Err("Failed to commit virtual memory");
+                }
+            }
+            #[cfg(unix)]
+            {
+                let result = libc::mprotect(
+                    commit_ptr,
+                    size,
+                    libc::PROT_READ | libc::PROT_WRITE,
+                );
+                if result != 0 {
+                    return Err("Failed to commit virtual memory");
+                }
+            }
+        }
+
+        self.committed_size = self.committed_size.max(end);
+        Ok(())
+    }
+
+    pub fn decommit(&mut self, offset: usize, size: usize) -> Result<(), &'static str> {
+        let offset = (offset + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+        let end = offset + size;
+
+        if end > self.committed_size {
+            return Err("Decommit size exceeds committed size");
+        }
+
+        let decommit_ptr = unsafe {
+            self.ptr.add(offset)
+        };
+
+        unsafe {
+            #[cfg(windows)]
+            {
+                use windows_sys::Win32::System::Memory::VirtualFree;
+                let result = VirtualFree(
+                    decommit_ptr as *mut _,
+                    size,
+                    windows_sys::Win32::System::Memory::MEM_DECOMMIT,
+                );
+                if result == 0 {
+                    return Err("Failed to decommit virtual memory");
+                }
+            }
+            #[cfg(unix)]
+            {
+                let result = libc::mprotect(
+                    decommit_ptr,
+                    size,
+                    libc::PROT_NONE,
+                );
+                if result != 0 {
+                    return Err("Failed to decommit virtual memory");
+                }
+                
+                // Also discard the pages to free physical memory
+                libc::madvice(decommit_ptr, size, libc::MADV_DONTNEED);
+            }
+        }
+
+        // If we're decommitting the end of the committed region, shrink it
+        if end == self.committed_size {
+            self.committed_size = offset;
+        }
+
+        Ok(())
+    }
+
+    pub fn reset(&mut self) {
+        if self.committed_size > 0 {
+            let _ = self.decommit(0, self.committed_size);
+        }
+    }
+}
+
+impl Drop for VirtualMemoryRegion {
+    fn drop(&mut self) {
+        if !self.ptr.is_null() {
+            unsafe {
+                #[cfg(windows)]
+                {
+                    use windows_sys::Win32::System::Memory::VirtualFree;
+                    VirtualFree(
+                        self.ptr as *mut _,
+                        0,
+                        windows_sys::Win32::System::Memory::MEM_RELEASE,
+                    );
+                }
+                #[cfg(unix)]
+                {
+                    libc::munmap(self.ptr, self.reserved_size);
+                }
+            }
+        }
+    }
+}
+
+// Virtual chunk that uses virtual memory region
+pub struct VirtualChunk {
+    region: VirtualMemoryRegion,
+    capacity: usize,
+    used: std::sync::atomic::AtomicUsize,
+}
+
+impl VirtualChunk {
+    pub fn new(capacity: usize) -> Result<Self, &'static str> {
+        let mut region = VirtualMemoryRegion::new(capacity)?;
+        
+        // Commit initial chunk
+        let initial_commit = capacity.min(DEFAULT_COMMIT_SIZE);
+        region.commit(0, initial_commit)?;
+
+        Ok(Self {
+            region,
+            capacity,
+            used: core::sync::atomic::AtomicUsize::new(0),
+        })
+    }
+
+    pub unsafe fn allocate(&self, layout: alloc::alloc::Layout) -> Option<*mut u8> {
+        let size = layout.size();
+        let align = layout.align();
+        
+        let current_used = self.used.load(core::sync::atomic::Ordering::Acquire);
+        let start = (current_used + align - 1) & !(align - 1);
+        let end = start + size;
+
+        if end > self.capacity {
+            return None;
+        }
+
+        // Ensure the memory is committed
+        if end > self.region.committed_size {
+            let additional_size = end - self.region.committed_size;
+            if let Err(_) = (*(&self.region as *const _ as *mut VirtualMemoryRegion))
+                .commit(self.region.committed_size, additional_size) {
+                return None;
+            }
+        }
+
+        if self.used.compare_exchange_weak(
+            current_used,
+            end,
+            core::sync::atomic::Ordering::AcqRel,
+            core::sync::atomic::Ordering::Acquire,
+        ).is_ok() {
+            let ptr = self.region.ptr.add(start);
+            return Some(ptr);
+        }
+
+        None
+    }
+
+    pub fn reset(&mut self) {
+        self.used.store(0, core::sync::atomic::Ordering::Release);
+        self.region.reset();
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn used(&self) -> usize {
+        self.used.load(core::sync::atomic::Ordering::Acquire)
+    }
+}
