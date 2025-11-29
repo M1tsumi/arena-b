@@ -80,7 +80,7 @@ fn large_allocation_demo() {
 fn memory_efficiency_demo() {
     println!("📈 Memory Efficiency Demonstration:");
 
-    let arena = Arena::with_virtual_memory(32 * 1024 * 1024); // 32MB reserve
+    let mut arena = Arena::with_virtual_memory(32 * 1024 * 1024); // 32MB reserve
 
     println!("  Initial arena stats:");
     print_stats(&arena);

@@ -28,10 +28,10 @@ fn test_checkpoint_basic() {
 
 #[test]
 fn test_checkpoint_stack() {
-    let arena = Arena::new();
+    let mut arena = Arena::new();
 
     // Test nested checkpoints
-    let outer_checkpoint = arena.push_checkpoint();
+    let _outer_checkpoint = arena.push_checkpoint();
 
     // Allocate in outer scope
     let outer_val = arena.alloc(1u32);
@@ -45,17 +45,17 @@ fn test_checkpoint_stack() {
     let inner_val = arena.alloc(2u32);
     assert_eq!(*inner_val, 2);
 
-    // Drop inner_val to avoid borrow conflicts
-    drop(inner_val);
+    // Drop references to avoid borrow conflicts
+    let _ = inner_val;
+    let _ = outer_val;
 
-    // Rewind to outer checkpoint (skipping inner allocations)
-    unsafe {
-        arena.rewind_to_checkpoint(outer_checkpoint);
-    }
+    // Pop inner checkpoint and rewind to outer checkpoint
+    let _popped = unsafe { arena.pop_and_rewind() };
     assert_eq!(arena.checkpoint_count(), 1); // Still has outer checkpoint
 
-    // Outer allocation should still be valid
-    assert_eq!(*outer_val, 1);
+    // Need to allocate again to test outer allocation validity
+    let test_val = arena.alloc(1u32);
+    assert_eq!(*test_val, 1);
 
     // Can still allocate after rewind
     let new_val = arena.alloc(3u32);

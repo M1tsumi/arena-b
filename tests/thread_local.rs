@@ -1,7 +1,5 @@
 #[cfg(feature = "thread_local")]
 use arena_b::Arena;
-#[cfg(feature = "thread_local")]
-use std::thread;
 
 #[cfg(feature = "thread_local")]
 #[test]
