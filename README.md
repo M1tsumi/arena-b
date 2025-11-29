@@ -36,6 +36,8 @@ The core type is `arena_b::Arena`, a bump allocator that lets you allocate many 
 
 `arena-b` is published on [crates.io](https://crates.io/crates/arena-b).
 
+**Note: macOS compatibility is temporarily removed due to build issues. Support will be restored in a future release.**
+
 Add it to your `Cargo.toml`:
 
 ```toml
