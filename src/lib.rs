@@ -506,7 +506,7 @@ mod debug {
         // Map from arena pointer to its allocation tracking
         // Use usize as key instead of raw pointer to avoid alignment issues
         pub allocations: HashMap<usize, HashMap<usize, AllocationInfo>>,
-        current_checkpoint_ids: HashMap<usize, u64>,
+        pub current_checkpoint_ids: HashMap<usize, u64>,
     }
 
     unsafe impl Send for DebugState {}
@@ -1705,6 +1705,15 @@ impl Arena {
             if let Some(ref buffer) = inner.lockfree_buffer {
                 buffer.reset();
             }
+        }
+
+        // v0.5.0: Clear debug state on full reset
+        #[cfg(feature = "debug")]
+        {
+            let arena_id = self as *const Arena as usize;
+            let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+            debug_state.allocations.remove(&arena_id);
+            debug_state.current_checkpoint_ids.remove(&arena_id);
         }
     }
 
