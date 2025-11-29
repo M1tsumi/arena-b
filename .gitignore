@@ -17,3 +17,9 @@ Thumbs.db
 *.log
 *.tmp
 *.swp
+
+# Release files (keep local only)
+release_notes/
+v0.5.0/
+RELEASE_NOTES.md
+V0_5_0_RELEASE.md

@@ -1,16 +1,586 @@
-use core::cell::UnsafeCell;
-use core::marker::PhantomData;
-use core::mem::{self, MaybeUninit};
-use core::ptr;
-use core::slice;
-use core::sync::atomic::{AtomicUsize, Ordering};
-use std::alloc::{self, Layout};
-use std::ptr::NonNull;
-use std::sync::Mutex;
+use std::alloc::Layout;
+use std::cell::UnsafeCell;
+use std::marker::PhantomData;
+use std::mem::{self, MaybeUninit};
+use std::ptr::{self, NonNull};
+use std::slice;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Mutex,
+};
 use std::vec::Vec;
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+
+// v0.5.0: Virtual memory strategy
+#[cfg(feature = "virtual_memory")]
+mod virtual_memory {
+    use super::*;
+
+    #[cfg(windows)]
+    use std::ffi::OsStr;
+    #[cfg(windows)]
+    use std::os::windows::ffi::OsStrExt;
+
+    #[cfg(unix)]
+    use std::os::unix::ffi::OsStrExt;
+
+    const PAGE_SIZE: usize = 4096;
+    const DEFAULT_RESERVE_SIZE: usize = 16 * 1024 * 1024; // 16MB
+    const DEFAULT_COMMIT_SIZE: usize = 64 * 1024; // 64KB
+
+    // Virtual memory region using reserve/commit pattern
+    pub struct VirtualMemoryRegion {
+        pub ptr: *mut u8,
+        pub reserved_size: usize,
+        pub committed_size: usize,
+    }
+
+    impl VirtualMemoryRegion {
+        pub fn new(reserve_size: usize) -> Result<Self, &'static str> {
+            let reserve_size = (reserve_size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+
+            let ptr = unsafe {
+                #[cfg(windows)]
+                {
+                    use std::os::windows::io::AsRawHandle;
+                    use windows_sys::Win32::System::Memory::{
+                        VirtualAlloc, MEM_COMMIT, MEM_RESERVE, PAGE_READWRITE,
+                    };
+
+                    VirtualAlloc(
+                        std::ptr::null_mut(),
+                        reserve_size,
+                        MEM_RESERVE,
+                        PAGE_READWRITE,
+                    )
+                }
+
+                #[cfg(unix)]
+                {
+                    libc::mmap(
+                        std::ptr::null_mut(),
+                        reserve_size,
+                        libc::PROT_NONE,
+                        libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+                        -1,
+                        0,
+                    )
+                }
+            };
+
+            if ptr.is_null() {
+                return Err("Failed to reserve virtual memory");
+            }
+
+            Ok(Self {
+                ptr: ptr as *mut u8,
+                reserved_size: reserve_size,
+                committed_size: 0,
+            })
+        }
+
+        pub fn commit(&mut self, size: usize) -> Result<*mut u8, &'static str> {
+            let commit_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+            let new_committed = self.committed_size + commit_size;
+
+            if new_committed > self.reserved_size {
+                return Err("Cannot commit beyond reserved size");
+            }
+
+            unsafe {
+                #[cfg(windows)]
+                {
+                    use windows_sys::Win32::System::Memory::{
+                        VirtualAlloc, MEM_COMMIT, PAGE_READWRITE,
+                    };
+
+                    let commit_ptr = VirtualAlloc(
+                        self.ptr.add(self.committed_size) as *mut _,
+                        commit_size,
+                        MEM_COMMIT,
+                        PAGE_READWRITE,
+                    );
+
+                    if commit_ptr.is_null() {
+                        return Err("Failed to commit virtual memory");
+                    }
+                }
+
+                #[cfg(unix)]
+                {
+                    let result = libc::mprotect(
+                        self.ptr.add(self.committed_size),
+                        commit_size,
+                        libc::PROT_READ | libc::PROT_WRITE,
+                    );
+
+                    if result != 0 {
+                        return Err("Failed to change memory protection");
+                    }
+                }
+            }
+
+            self.committed_size = new_committed;
+            unsafe { Ok(self.ptr.add(self.committed_size - commit_size)) }
+        }
+
+        pub fn decommit(&mut self, offset: usize, size: usize) {
+            let decommit_size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
+
+            unsafe {
+                #[cfg(windows)]
+                {
+                    use windows_sys::Win32::System::Memory::{VirtualFree, MEM_DECOMMIT};
+
+                    VirtualFree(self.ptr.add(offset) as *mut _, decommit_size, MEM_DECOMMIT);
+                }
+
+                #[cfg(unix)]
+                {
+                    libc::mprotect(self.ptr.add(offset), decommit_size, libc::PROT_NONE);
+                }
+            }
+        }
+
+        pub fn reset(&mut self) {
+            if self.committed_size > 0 {
+                self.decommit(0, self.committed_size);
+                self.committed_size = 0;
+            }
+        }
+    }
+
+    impl Drop for VirtualMemoryRegion {
+        fn drop(&mut self) {
+            unsafe {
+                #[cfg(windows)]
+                {
+                    use windows_sys::Win32::System::Memory::{VirtualFree, MEM_RELEASE};
+
+                    VirtualFree(self.ptr as *mut _, 0, MEM_RELEASE);
+                }
+
+                #[cfg(unix)]
+                {
+                    libc::munmap(self.ptr as *mut _, self.reserved_size);
+                }
+            }
+        }
+    }
+
+    unsafe impl Send for VirtualMemoryRegion {}
+    unsafe impl Sync for VirtualMemoryRegion {}
+}
+
+// v0.5.0: Thread-local caching for reduced contention
+#[cfg(feature = "thread_local")]
+mod thread_local_cache {
+    use super::*;
+    use std::cell::RefCell;
+    use std::thread::LocalKey;
+
+    const THREAD_CACHE_SIZE: usize = 1024; // 1KB per thread
+    const MAX_THREAD_CACHE_SIZE: usize = 4096; // 4KB max per thread
+
+    // Thread-local allocation cache
+    thread_local! {
+        static THREAD_CACHE: RefCell<ThreadCache> = RefCell::new(ThreadCache::new());
+    }
+
+    #[repr(C, align(64))]
+    struct ThreadCache {
+        buffer: *mut u8,
+        capacity: usize,
+        used: usize,
+        arena_id: usize,
+    }
+
+    impl ThreadCache {
+        fn new() -> Self {
+            Self {
+                buffer: std::ptr::null_mut(),
+                capacity: 0,
+                used: 0,
+                arena_id: 0,
+            }
+        }
+
+        fn reset(&mut self) {
+            if !self.buffer.is_null() {
+                unsafe {
+                    std::alloc::dealloc(
+                        self.buffer,
+                        std::alloc::Layout::from_size_align(self.capacity, 64).unwrap(),
+                    );
+                }
+                self.buffer = std::ptr::null_mut();
+                self.capacity = 0;
+                self.used = 0;
+            }
+        }
+
+        fn ensure_capacity(&mut self, arena_id: usize) -> bool {
+            if self.arena_id != arena_id {
+                self.reset();
+                self.arena_id = arena_id;
+            }
+
+            if self.buffer.is_null() {
+                let layout = std::alloc::Layout::from_size_align(THREAD_CACHE_SIZE, 64).unwrap();
+                self.buffer = unsafe { std::alloc::alloc(layout) };
+                if self.buffer.is_null() {
+                    std::alloc::handle_alloc_error(layout);
+                }
+                self.capacity = THREAD_CACHE_SIZE;
+                self.used = 0;
+                true
+            } else {
+                true
+            }
+        }
+
+        fn try_alloc(&mut self, size: usize, align: usize) -> Option<*mut u8> {
+            if self.buffer.is_null() || self.capacity == 0 {
+                return None;
+            }
+
+            let current = self.used;
+            let aligned = (current + align - 1) & !(align - 1);
+            let end = aligned + size;
+
+            if end <= self.capacity {
+                self.used = end;
+                Some(unsafe { self.buffer.add(aligned) })
+            } else {
+                None
+            }
+        }
+
+        fn grow(&mut self) -> bool {
+            if self.capacity >= MAX_THREAD_CACHE_SIZE {
+                return false;
+            }
+
+            let new_capacity = (self.capacity * 2).min(MAX_THREAD_CACHE_SIZE);
+            let new_layout = std::alloc::Layout::from_size_align(new_capacity, 64).unwrap();
+
+            let new_buffer = if self.buffer.is_null() {
+                unsafe { std::alloc::alloc(new_layout) }
+            } else {
+                let old_layout = std::alloc::Layout::from_size_align(self.capacity, 64).unwrap();
+                unsafe { std::alloc::realloc(self.buffer, old_layout, new_capacity) }
+            };
+
+            if new_buffer.is_null() {
+                std::alloc::handle_alloc_error(new_layout);
+            }
+
+            self.buffer = new_buffer;
+            self.capacity = new_capacity;
+            true
+        }
+
+        fn reset_usage(&mut self) {
+            self.used = 0;
+        }
+    }
+
+    impl Drop for ThreadCache {
+        fn drop(&mut self) {
+            self.reset();
+        }
+    }
+
+    // Public interface for thread-local caching
+    pub fn try_thread_local_alloc(arena_id: usize, size: usize, align: usize) -> Option<*mut u8> {
+        THREAD_CACHE.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            if cache.ensure_capacity(arena_id) {
+                // Try to allocate from current cache
+                if let Some(ptr) = cache.try_alloc(size, align) {
+                    return Some(ptr);
+                }
+
+                // If that fails, try to grow the cache and retry
+                if cache.grow() {
+                    cache.try_alloc(size, align)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn reset_thread_cache() {
+        THREAD_CACHE.with(|cache| {
+            cache.borrow_mut().reset_usage();
+        });
+    }
+
+    pub fn clear_thread_cache() {
+        THREAD_CACHE.with(|cache| {
+            cache.borrow_mut().reset();
+        });
+    }
+}
+
+// v0.5.0: Lock-free optimizations for reduced contention
+#[cfg(feature = "lockfree")]
+mod lockfree {
+    use super::*;
+    use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
+
+    // Lock-free per-thread allocation buffer
+    #[repr(C, align(64))]
+    pub struct LockFreeBuffer {
+        ptr: AtomicPtr<u8>,
+        capacity: AtomicUsize,
+        used: AtomicUsize,
+        next: AtomicPtr<LockFreeBuffer>,
+    }
+
+    impl LockFreeBuffer {
+        pub fn new(capacity: usize) -> Self {
+            let layout = std::alloc::Layout::from_size_align(capacity, 64).unwrap();
+            let ptr = unsafe { std::alloc::alloc(layout) };
+            if ptr.is_null() {
+                std::alloc::handle_alloc_error(layout);
+            }
+
+            Self {
+                ptr: AtomicPtr::new(ptr),
+                capacity: AtomicUsize::new(capacity),
+                used: AtomicUsize::new(0),
+                next: AtomicPtr::new(std::ptr::null_mut()),
+            }
+        }
+
+        pub fn try_alloc(&self, size: usize, align: usize) -> Option<*mut u8> {
+            let current = self.used.load(Ordering::Acquire);
+            let aligned = (current + align - 1) & !(align - 1);
+            let end = aligned + size;
+            let capacity = self.capacity.load(Ordering::Acquire);
+
+            if end <= capacity {
+                // Try to atomically claim the space
+                if self
+                    .used
+                    .compare_exchange_weak(current, end, Ordering::Release, Ordering::Relaxed)
+                    .is_ok()
+                {
+                    let ptr = self.ptr.load(Ordering::Acquire);
+                    Some(unsafe { ptr.add(aligned) })
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+
+        pub fn reset(&self) {
+            self.used.store(0, Ordering::Release);
+        }
+
+        pub fn is_full(&self, size: usize, align: usize) -> bool {
+            let current = self.used.load(Ordering::Acquire);
+            let aligned = (current + align - 1) & !(align - 1);
+            let end = aligned + size;
+            let capacity = self.capacity.load(Ordering::Acquire);
+            end > capacity
+        }
+    }
+
+    impl Drop for LockFreeBuffer {
+        fn drop(&mut self) {
+            let ptr = self.ptr.load(Ordering::Acquire);
+            let capacity = self.capacity.load(Ordering::Acquire);
+            if !ptr.is_null() && capacity > 0 {
+                unsafe {
+                    let layout = std::alloc::Layout::from_size_align(capacity, 64).unwrap();
+                    std::alloc::dealloc(ptr, layout);
+                }
+            }
+        }
+    }
+
+    unsafe impl Send for LockFreeBuffer {}
+    unsafe impl Sync for LockFreeBuffer {}
+
+    // Lock-free allocation statistics
+    #[repr(C, align(64))]
+    pub struct LockFreeStats {
+        allocations: AtomicUsize,
+        cache_hits: AtomicUsize,
+        cache_misses: AtomicUsize,
+        contention_count: AtomicUsize,
+    }
+
+    impl LockFreeStats {
+        pub fn new() -> Self {
+            Self {
+                allocations: AtomicUsize::new(0),
+                cache_hits: AtomicUsize::new(0),
+                cache_misses: AtomicUsize::new(0),
+                contention_count: AtomicUsize::new(0),
+            }
+        }
+
+        pub fn record_allocation(&self) {
+            self.allocations.fetch_add(1, Ordering::Relaxed);
+        }
+
+        pub fn record_cache_hit(&self) {
+            self.cache_hits.fetch_add(1, Ordering::Relaxed);
+        }
+
+        pub fn record_cache_miss(&self) {
+            self.cache_misses.fetch_add(1, Ordering::Relaxed);
+        }
+
+        pub fn record_contention(&self) {
+            self.contention_count.fetch_add(1, Ordering::Relaxed);
+        }
+
+        pub fn get_stats(&self) -> (usize, usize, usize, usize) {
+            (
+                self.allocations.load(Ordering::Relaxed),
+                self.cache_hits.load(Ordering::Relaxed),
+                self.cache_misses.load(Ordering::Relaxed),
+                self.contention_count.load(Ordering::Relaxed),
+            )
+        }
+    }
+
+    unsafe impl Send for LockFreeStats {}
+    unsafe impl Sync for LockFreeStats {}
+}
+
+#[cfg(feature = "debug")]
+mod debug {
+    use super::*;
+    use std::collections::HashMap;
+    use std::sync::{LazyLock, RwLock};
+
+    // Magic values for debug guards
+    pub const GUARD_MAGIC: u64 = 0xDEADBEEFCAFEBABE;
+    pub const FREED_MAGIC: u64 = 0xFEEDFACECAFEBABE;
+
+    // Debug allocation metadata
+    #[derive(Debug, Clone)]
+    pub struct AllocationInfo {
+        pub ptr: *mut u8,
+        pub size: usize,
+        pub checkpoint_id: u64,
+        pub magic: u64,
+    }
+
+    unsafe impl Send for AllocationInfo {}
+    unsafe impl Sync for AllocationInfo {}
+
+    // Global debug state - per-arena approach
+    pub static DEBUG_STATE: LazyLock<RwLock<DebugState>> =
+        LazyLock::new(|| RwLock::new(DebugState::new()));
+
+    #[derive(Debug)]
+    pub struct DebugState {
+        // Map from arena pointer to its allocation tracking
+        pub allocations: HashMap<usize, HashMap<*mut u8, AllocationInfo>>,
+        current_checkpoint_ids: HashMap<usize, u64>,
+    }
+
+    unsafe impl Send for DebugState {}
+    unsafe impl Sync for DebugState {}
+
+    impl DebugState {
+        pub fn new() -> Self {
+            Self {
+                allocations: HashMap::new(),
+                current_checkpoint_ids: HashMap::new(),
+            }
+        }
+
+        pub fn register_allocation(
+            &mut self,
+            arena_id: usize,
+            ptr: *mut u8,
+            size: usize,
+            checkpoint_id: u64,
+        ) {
+            let arena_allocations = self
+                .allocations
+                .entry(arena_id)
+                .or_insert_with(HashMap::new);
+            let info = AllocationInfo {
+                ptr,
+                size,
+                checkpoint_id,
+                magic: GUARD_MAGIC,
+            };
+            arena_allocations.insert(ptr, info);
+        }
+
+        pub fn check_use_after_rewind(
+            &self,
+            arena_id: usize,
+            ptr: *const u8,
+        ) -> Result<(), String> {
+            if let Some(arena_allocations) = self.allocations.get(&arena_id) {
+                if let Some(info) = arena_allocations.get(&(ptr as *mut u8)) {
+                    if info.magic != GUARD_MAGIC {
+                        return Err(format!("Use after rewind detected at {:p}", ptr));
+                    }
+                    Ok(())
+                } else {
+                    Err(format!("Unknown allocation at {:p}", ptr))
+                }
+            } else {
+                Err(format!("Unknown arena at {:p}", arena_id as *const ()))
+            }
+        }
+
+        pub fn rewind_to_checkpoint(&mut self, arena_id: usize, checkpoint_id: u64) {
+            self.current_checkpoint_ids
+                .insert(arena_id, checkpoint_id + 1);
+
+            if let Some(arena_allocations) = self.allocations.get_mut(&arena_id) {
+                // Mark all allocations after this checkpoint as freed
+                arena_allocations.retain(|_, info| {
+                    if info.checkpoint_id <= checkpoint_id {
+                        info.magic == GUARD_MAGIC
+                    } else {
+                        info.magic = FREED_MAGIC;
+                        false
+                    }
+                });
+            }
+        }
+
+        pub fn get_current_checkpoint_id(&self, arena_id: usize) -> u64 {
+            self.current_checkpoint_ids
+                .get(&arena_id)
+                .copied()
+                .unwrap_or(1)
+        }
+
+        pub fn get_stats(&self, arena_id: usize) -> (usize, usize) {
+            if let Some(arena_allocations) = self.allocations.get(&arena_id) {
+                let total = arena_allocations.len();
+                let corrupted = arena_allocations
+                    .values()
+                    .filter(|info| info.magic != GUARD_MAGIC)
+                    .count();
+                (total, corrupted)
+            } else {
+                (0, 0)
+            }
+        }
+    }
+}
 
 const CHUNK_ALIGN: usize = 64;
 const DEFAULT_CHUNK_SIZE: usize = 64 * 1024;
@@ -62,7 +632,7 @@ impl MemoryPool {
             } else {
                 // Pool is full, actually deallocate
                 let layout = Layout::from_size_align(size, 8).unwrap();
-                alloc::dealloc(ptr.as_ptr(), layout);
+                std::alloc::dealloc(ptr.as_ptr(), layout);
             }
         }
     }
@@ -74,6 +644,38 @@ struct AtomicCounter {
     _padding: [u8; 64],
 }
 
+// v0.5.0: Debug guard structures
+#[cfg(feature = "debug")]
+#[repr(C)]
+struct DebugGuard {
+    magic_before: u64,
+    ptr: *mut u8,
+    size: usize,
+    checkpoint_id: u64,
+    magic_after: u64,
+}
+
+#[cfg(feature = "debug")]
+impl DebugGuard {
+    fn new(ptr: *mut u8, size: usize, checkpoint_id: u64) -> Self {
+        Self {
+            magic_before: debug::GUARD_MAGIC,
+            ptr,
+            size,
+            checkpoint_id,
+            magic_after: debug::GUARD_MAGIC,
+        }
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.magic_before != debug::GUARD_MAGIC || self.magic_after != debug::GUARD_MAGIC {
+            Err("Debug guard corruption detected".to_string())
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[repr(C, align(64))]
 struct Chunk {
     ptr: NonNull<u8>,
@@ -82,18 +684,109 @@ struct Chunk {
     _padding: [u8; 64 - 3 * 8], // Cache line padding
 }
 
+// v0.5.0: Virtual memory chunk
+#[cfg(feature = "virtual_memory")]
+#[repr(C, align(64))]
+struct VirtualChunk {
+    region: UnsafeCell<virtual_memory::VirtualMemoryRegion>,
+    capacity: usize,
+    used: AtomicUsize,
+    _padding: [u8; 64 - 3 * 8], // Cache line padding
+}
+
+#[cfg(feature = "virtual_memory")]
+impl VirtualChunk {
+    fn new(reserve_size: usize) -> Result<Self, &'static str> {
+        let region = virtual_memory::VirtualMemoryRegion::new(reserve_size)?;
+        Ok(Self {
+            region: UnsafeCell::new(region),
+            capacity: reserve_size,
+            used: AtomicUsize::new(0),
+            _padding: [0; 64 - 3 * 8],
+        })
+    }
+
+    unsafe fn allocate(&self, size: usize, align: usize) -> Option<*mut u8> {
+        let current = self.used.load(Ordering::Acquire);
+        let aligned = (current + align - 1) & !(align - 1);
+        let end = aligned + size;
+
+        if end <= self.capacity {
+            if self
+                .used
+                .compare_exchange_weak(current, end, Ordering::Release, Ordering::Relaxed)
+                .is_ok()
+            {
+                let region = &mut *self.region.get();
+                // Commit memory if needed
+                if end > region.committed_size {
+                    if region.commit(end - region.committed_size).is_ok() {
+                        return Some(region.ptr.add(aligned));
+                    } else {
+                        // Rollback on failure
+                        self.used.store(current, Ordering::Release);
+                        return None;
+                    }
+                }
+                return Some(region.ptr.add(aligned));
+            }
+        }
+        None
+    }
+
+    fn reset(&self) {
+        let region = unsafe { &mut *self.region.get() };
+        region.reset();
+        self.used.store(0, Ordering::Release);
+    }
+}
+
 #[repr(C, align(64))]
 struct ArenaInner {
     chunks: Vec<Chunk>,
     current_chunk: AtomicUsize,
     total_allocated: AtomicCounter,
-    _padding: [u8; 64 - 2 * 8 - 8], // Cache line padding
+    checkpoints: Vec<ArenaCheckpoint>, // v0.5.0: Fast reset checkpoints
+    #[cfg(feature = "debug")]
+    current_checkpoint_id: u64, // v0.5.0: Debug tracking
+    #[cfg(feature = "virtual_memory")]
+    virtual_chunk: Option<VirtualChunk>, // v0.5.0: Virtual memory chunk
+    #[cfg(feature = "lockfree")]
+    lockfree_buffer: Option<lockfree::LockFreeBuffer>, // v0.5.0: Lock-free allocation buffer
+    _padding: [u8; 64 - 2 * 8 - 8 - 8], // Cache line padding
+}
+
+/// v0.5.0: Arena checkpoint for fast reset functionality
+#[derive(Copy, Clone, Debug)]
+pub struct ArenaCheckpoint {
+    chunk_index: usize,
+    chunk_offset: usize,
+    allocation_count: usize,
+    bytes_used: usize,
+    #[cfg(feature = "debug")]
+    checkpoint_id: u64, // v0.5.0: Debug tracking
+}
+
+/// Debug statistics for the arena when debug feature is enabled.
+#[cfg(feature = "debug")]
+#[derive(Debug, Clone)]
+pub struct DebugStats {
+    /// Total number of allocations being tracked
+    pub total_allocations: usize,
+    /// Number of active checkpoints
+    pub active_checkpoints: usize,
+    /// Current checkpoint ID
+    pub current_checkpoint_id: u64,
+    /// Number of corrupted allocations detected
+    pub corrupted_allocations: usize,
 }
 
 pub struct Arena {
     inner: UnsafeCell<ArenaInner>,
     #[cfg(feature = "stats")]
     stats: AtomicStats,
+    #[cfg(feature = "lockfree")]
+    lockfree_stats: lockfree::LockFreeStats, // v0.5.0: Lock-free statistics
     memory_pool: UnsafeCell<MemoryPool>,
     _padding: [u8; 64], // Cache line padding to avoid false sharing
 }
@@ -177,6 +870,50 @@ impl Arena {
         }
     }
 
+    /// Creates a new arena with virtual memory strategy.
+    ///
+    /// This method uses a reserve/commit pattern for better memory efficiency
+    /// when the arena grows large. Available only when the "virtual_memory" feature is enabled.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the virtual memory reservation fails.
+    #[cfg(feature = "virtual_memory")]
+    pub fn with_virtual_memory(reserve_size: usize) -> Self {
+        assert!(reserve_size > 0);
+
+        let first_chunk = unsafe { allocate_chunk(DEFAULT_CHUNK_SIZE) };
+        let virtual_chunk =
+            VirtualChunk::new(reserve_size).expect("Failed to create virtual memory chunk");
+
+        let inner = ArenaInner {
+            chunks: vec![first_chunk],
+            current_chunk: AtomicUsize::new(0),
+            total_allocated: AtomicCounter { _padding: [0; 64] },
+            checkpoints: Vec::new(),
+            #[cfg(feature = "debug")]
+            current_checkpoint_id: 1,
+            virtual_chunk: Some(virtual_chunk),
+            #[cfg(feature = "lockfree")]
+            lockfree_buffer: Some(lockfree::LockFreeBuffer::new(4096)), // v0.5.0: Initialize lock-free buffer
+            _padding: [0; 64 - 2 * 8 - 8 - 8],
+        };
+
+        Arena {
+            inner: UnsafeCell::new(inner),
+            #[cfg(feature = "stats")]
+            stats: AtomicStats {
+                bytes_used: AtomicUsize::new(0),
+                allocation_count: AtomicUsize::new(0),
+                _padding: [0; 64 - 2 * 8],
+            },
+            #[cfg(feature = "lockfree")]
+            lockfree_stats: lockfree::LockFreeStats::new(), // v0.5.0: Initialize lock-free stats
+            memory_pool: UnsafeCell::new(MemoryPool::new()),
+            _padding: [0; 64],
+        }
+    }
+
     /// Creates a new arena with a specific initial capacity in bytes.
     ///
     /// # Panics
@@ -192,7 +929,14 @@ impl Arena {
             chunks: vec![first_chunk],
             current_chunk: AtomicUsize::new(0),
             total_allocated: AtomicCounter { _padding: [0; 64] },
-            _padding: [0; 64 - 2 * 8 - 8],
+            checkpoints: Vec::new(), // v0.5.0: Initialize checkpoints
+            #[cfg(feature = "debug")]
+            current_checkpoint_id: 1, // v0.5.0: Start with checkpoint ID 1
+            #[cfg(feature = "virtual_memory")]
+            virtual_chunk: None, // v0.5.0: Initialize virtual chunk as None
+            #[cfg(feature = "lockfree")]
+            lockfree_buffer: Some(lockfree::LockFreeBuffer::new(4096)), // v0.5.0: Initialize lock-free buffer
+            _padding: [0; 64 - 2 * 8 - 8 - 8],
         };
         Arena {
             inner: UnsafeCell::new(inner),
@@ -202,6 +946,8 @@ impl Arena {
                 allocation_count: AtomicUsize::new(0),
                 _padding: [0; 64 - 2 * 8],
             },
+            #[cfg(feature = "lockfree")]
+            lockfree_stats: lockfree::LockFreeStats::new(), // v0.5.0: Initialize lock-free stats
             memory_pool: UnsafeCell::new(MemoryPool::new()),
             _padding: [0; 64],
         }
@@ -225,9 +971,84 @@ impl Arena {
             return NonNull::<u8>::dangling().as_ptr();
         }
 
+        // v0.5.0: Try lock-free buffer for small allocations
+        #[cfg(feature = "lockfree")]
+        {
+            if size <= 1024 {
+                // Use lock-free for small-to-medium allocations
+                let inner = unsafe { &*self.inner.get() };
+                if let Some(ref buffer) = inner.lockfree_buffer {
+                    if let Some(ptr) = buffer.try_alloc(size, align) {
+                        // v0.5.0: Record lock-free stats
+                        self.lockfree_stats.record_allocation();
+                        self.lockfree_stats.record_cache_hit();
+
+                        // v0.5.0: Debug allocation tracking
+                        #[cfg(feature = "debug")]
+                        {
+                            let arena_id = self as *const Arena as usize;
+                            let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+                            debug_state.register_allocation(
+                                arena_id,
+                                ptr,
+                                size,
+                                inner.current_checkpoint_id,
+                            );
+                        }
+                        #[cfg(feature = "stats")]
+                        self.stats.allocation_count.fetch_add(1, Ordering::Relaxed);
+                        return ptr;
+                    } else {
+                        self.lockfree_stats.record_cache_miss();
+                        self.lockfree_stats.record_contention();
+                    }
+                }
+            }
+        }
+
+        // v0.5.0: Try thread-local cache first for very small allocations
+        #[cfg(feature = "thread_local")]
+        {
+            if size <= 512 {
+                // Only cache very small allocations
+                let arena_id = self as *const Arena as usize;
+                if let Some(ptr) = thread_local_cache::try_thread_local_alloc(arena_id, size, align)
+                {
+                    // v0.5.0: Debug allocation tracking
+                    #[cfg(feature = "debug")]
+                    {
+                        let inner = unsafe { &*self.inner.get() };
+                        let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+                        debug_state.register_allocation(
+                            arena_id,
+                            ptr,
+                            size,
+                            inner.current_checkpoint_id,
+                        );
+                    }
+                    #[cfg(feature = "stats")]
+                    self.stats.allocation_count.fetch_add(1, Ordering::Relaxed);
+                    return ptr;
+                }
+            }
+        }
+
         // Fast path: try memory pool first for small allocations
         if size <= 4096 {
             if let Some(ptr) = unsafe { self.try_pool_alloc(size, align) } {
+                // v0.5.0: Debug allocation tracking
+                #[cfg(feature = "debug")]
+                {
+                    let arena_id = self as *const Arena as usize;
+                    let inner = unsafe { &*self.inner.get() };
+                    let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+                    debug_state.register_allocation(
+                        arena_id,
+                        ptr,
+                        size,
+                        inner.current_checkpoint_id,
+                    );
+                }
                 return ptr;
             }
         }
@@ -254,7 +1075,20 @@ impl Arena {
                     .is_ok()
                 {
                     self.record_allocation(end - current);
-                    return chunk.ptr.as_ptr().add(aligned);
+                    let ptr = chunk.ptr.as_ptr().add(aligned);
+                    // v0.5.0: Debug allocation tracking
+                    #[cfg(feature = "debug")]
+                    {
+                        let arena_id = self as *const Arena as usize;
+                        let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+                        debug_state.register_allocation(
+                            arena_id,
+                            ptr,
+                            size,
+                            inner.current_checkpoint_id,
+                        );
+                    }
+                    return ptr;
                 }
                 // CAS failed, retry once (common case)
                 let current = chunk.used.load(Ordering::Acquire);
@@ -267,7 +1101,20 @@ impl Arena {
                         .is_ok()
                 {
                     self.record_allocation(end - current);
-                    return chunk.ptr.as_ptr().add(aligned);
+                    let ptr = chunk.ptr.as_ptr().add(aligned);
+                    // v0.5.0: Debug allocation tracking
+                    #[cfg(feature = "debug")]
+                    {
+                        let arena_id = self as *const Arena as usize;
+                        let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+                        debug_state.register_allocation(
+                            arena_id,
+                            ptr,
+                            size,
+                            inner.current_checkpoint_id,
+                        );
+                    }
+                    return ptr;
                 }
             }
 
@@ -290,6 +1137,21 @@ impl Arena {
             }
 
             self.record_allocation(size);
+
+            // v0.5.0: Debug allocation tracking
+            #[cfg(feature = "debug")]
+            {
+                let arena_id = self as *const Arena as usize;
+                let inner = unsafe { &*self.inner.get() };
+                let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+                debug_state.register_allocation(
+                    arena_id,
+                    ptr.as_ptr(),
+                    size,
+                    inner.current_checkpoint_id,
+                );
+            }
+
             return Some(ptr.as_ptr());
         }
         None
@@ -346,7 +1208,23 @@ impl Arena {
         let end = aligned + layout.size();
         chunk.used.store(end, Ordering::Release);
         self.record_allocation(end);
-        chunk.ptr.as_ptr().add(aligned)
+        let ptr = chunk.ptr.as_ptr().add(aligned);
+
+        // v0.5.0: Debug allocation tracking
+        #[cfg(feature = "debug")]
+        {
+            let arena_id = self as *const Arena as usize;
+            let inner = unsafe { &mut *self.inner.get() };
+            let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+            debug_state.register_allocation(
+                arena_id,
+                ptr,
+                layout.size(),
+                inner.current_checkpoint_id,
+            );
+        }
+
+        ptr
     }
 
     /// Ultra-fast allocation for small types (≤ FAST_ALLOC_THRESHOLD bytes)
@@ -795,6 +1673,23 @@ impl Arena {
             self.stats.bytes_used.store(0, Ordering::Release);
             self.stats.allocation_count.store(0, Ordering::Release);
         }
+
+        // v0.5.0: Clear checkpoints on full reset
+        inner.checkpoints.clear();
+
+        // v0.5.0: Reset thread-local cache
+        #[cfg(feature = "thread_local")]
+        {
+            thread_local_cache::reset_thread_cache();
+        }
+
+        // v0.5.0: Reset lock-free buffer
+        #[cfg(feature = "lockfree")]
+        {
+            if let Some(ref buffer) = inner.lockfree_buffer {
+                buffer.reset();
+            }
+        }
     }
 
     #[inline]
@@ -857,6 +1752,331 @@ impl Arena {
                 .load(Ordering::Relaxed)
         }
     }
+
+    // v0.5.0: Fast Reset API - Arena checkpoint functionality
+
+    /// Creates a checkpoint of the current arena state.
+    ///
+    /// This saves the current allocation position and can be used later
+    /// with `rewind_to_checkpoint()` for fast bulk deallocation.
+    ///
+    /// # Returns
+    ///
+    /// Returns an `ArenaCheckpoint` that can be used to rewind to this state.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let arena = Arena::new();
+    /// let checkpoint = arena.checkpoint();
+    ///
+    /// // Make allocations...
+    /// let value1 = arena.alloc(42);
+    /// let value2 = arena.alloc(100);
+    ///
+    /// // Fast rewind to checkpoint
+    /// unsafe {
+    ///     arena.rewind_to_checkpoint(checkpoint);
+    /// }
+    /// ```
+    #[inline]
+    pub fn checkpoint(&self) -> ArenaCheckpoint {
+        let inner = unsafe { &*self.inner.get() };
+        let current_chunk_idx = inner.current_chunk.load(Ordering::Acquire);
+        let current_chunk = &inner.chunks[current_chunk_idx];
+        let chunk_offset = current_chunk.used.load(Ordering::Relaxed);
+
+        #[cfg(feature = "stats")]
+        let (allocation_count, bytes_used) = (
+            self.stats.allocation_count.load(Ordering::Relaxed),
+            self.stats.bytes_used.load(Ordering::Relaxed),
+        );
+
+        #[cfg(not(feature = "stats"))]
+        let (allocation_count, bytes_used) = (0, 0);
+
+        #[cfg(feature = "debug")]
+        let checkpoint_id = {
+            let arena_id = self as *const Arena as usize;
+            let debug_state = debug::DEBUG_STATE.read().unwrap();
+            debug_state.get_current_checkpoint_id(arena_id)
+        };
+
+        ArenaCheckpoint {
+            chunk_index: current_chunk_idx,
+            chunk_offset,
+            allocation_count,
+            bytes_used,
+            #[cfg(feature = "debug")]
+            checkpoint_id,
+        }
+    }
+
+    /// Rewinds the arena to a previous checkpoint state.
+    ///
+    /// This provides instant bulk deallocation by resetting the allocation
+    /// position to the checkpoint. All allocations made after the checkpoint
+    /// become invalid.
+    ///
+    /// # Safety
+    ///
+    /// - All references allocated after the checkpoint become invalid
+    /// - The checkpoint must be from this arena
+    /// - No other threads should be using the arena during rewind
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let arena = Arena::new();
+    /// let checkpoint = arena.checkpoint();
+    ///
+    /// // Frame-based allocation pattern
+    /// loop {
+    ///     let frame_checkpoint = arena.checkpoint();
+    ///     
+    ///     // Allocate frame data...
+    ///     let entities = arena.alloc_batch(&entity_data);
+    ///     
+    ///     // Process frame...
+    ///     
+    ///     // Fast cleanup - rewind to frame start
+    ///     unsafe {
+    ///         arena.rewind_to_checkpoint(frame_checkpoint);
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    pub unsafe fn rewind_to_checkpoint(&self, checkpoint: ArenaCheckpoint) {
+        let inner = &mut *self.inner.get();
+
+        // Validate checkpoint
+        assert!(
+            checkpoint.chunk_index < inner.chunks.len(),
+            "Invalid checkpoint: chunk index out of bounds"
+        );
+        assert!(
+            checkpoint.chunk_offset <= inner.chunks[checkpoint.chunk_index].capacity,
+            "Invalid checkpoint: offset exceeds chunk capacity"
+        );
+
+        // Reset current chunk and all subsequent chunks
+        inner
+            .current_chunk
+            .store(checkpoint.chunk_index, Ordering::Release);
+
+        for (i, chunk) in inner.chunks.iter_mut().enumerate() {
+            if i == checkpoint.chunk_index {
+                chunk.used.store(checkpoint.chunk_offset, Ordering::Release);
+            } else if i > checkpoint.chunk_index {
+                chunk.used.store(0, Ordering::Release);
+            }
+            // Chunks before checkpoint remain unchanged
+        }
+
+        // Reset stats to checkpoint values
+        #[cfg(feature = "stats")]
+        {
+            self.stats
+                .allocation_count
+                .store(checkpoint.allocation_count, Ordering::Release);
+            self.stats
+                .bytes_used
+                .store(checkpoint.bytes_used, Ordering::Release);
+        }
+
+        // v0.5.0: Remove checkpoints that were created after this checkpoint
+        inner.checkpoints.retain(|&cp| {
+            cp.chunk_index < checkpoint.chunk_index
+                || (cp.chunk_index == checkpoint.chunk_index
+                    && cp.chunk_offset <= checkpoint.chunk_offset)
+        });
+
+        // v0.5.0: Debug tracking for use-after-rewind detection
+        #[cfg(feature = "debug")]
+        {
+            let arena_id = self as *const Arena as usize;
+            let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+            debug_state.rewind_to_checkpoint(arena_id, checkpoint.checkpoint_id);
+            inner.current_checkpoint_id = checkpoint.checkpoint_id + 1;
+        }
+
+        // v0.5.0: Reset thread-local cache on rewind
+        #[cfg(feature = "thread_local")]
+        {
+            thread_local_cache::reset_thread_cache();
+        }
+
+        // v0.5.0: Reset lock-free buffer on rewind
+        #[cfg(feature = "lockfree")]
+        {
+            if let Some(ref buffer) = inner.lockfree_buffer {
+                buffer.reset();
+            }
+        }
+    }
+
+    /// Pushes a checkpoint onto the arena's checkpoint stack.
+    ///
+    /// This is useful for nested scoping scenarios where you want to
+    /// be able to rewind to the most recent checkpoint with `pop_checkpoint()`.
+    ///
+    /// # Returns
+    ///
+    /// Returns the checkpoint that was pushed.
+    #[inline]
+    pub fn push_checkpoint(&self) -> ArenaCheckpoint {
+        let checkpoint = self.checkpoint();
+        let inner = unsafe { &mut *self.inner.get() };
+        inner.checkpoints.push(checkpoint);
+        checkpoint
+    }
+
+    /// Pops and rewinds to the most recent checkpoint.
+    ///
+    /// This combines `pop_checkpoint()` and `rewind_to_checkpoint()` for
+    /// convenient nested scoping.
+    ///
+    /// # Safety
+    ///
+    /// - All references allocated after the checkpoint become invalid
+    /// - Must have a checkpoint on the stack (panics otherwise)
+    /// - No other threads should be using the arena during rewind
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no checkpoints on the stack.
+    #[inline]
+    pub unsafe fn pop_and_rewind(&mut self) -> ArenaCheckpoint {
+        let inner = &mut *self.inner.get();
+        let checkpoint = inner
+            .checkpoints
+            .pop()
+            .expect("Cannot pop checkpoint: no checkpoints on stack");
+        self.rewind_to_checkpoint(checkpoint);
+        checkpoint
+    }
+
+    /// Returns the number of checkpoints currently on the stack.
+    #[inline]
+    pub fn checkpoint_count(&self) -> usize {
+        let inner = unsafe { &*self.inner.get() };
+        inner.checkpoints.len()
+    }
+
+    /// Clears all checkpoints from the stack.
+    ///
+    /// This is useful when you want to reset the checkpoint management
+    /// without affecting the arena's allocated memory.
+    #[inline]
+    pub fn clear_checkpoints(&self) {
+        let inner = unsafe { &mut *self.inner.get() };
+        inner.checkpoints.clear();
+    }
+
+    // v0.5.0: Memory safety debug API
+
+    /// Checks if a reference is still valid (use-after-rewind detection).
+    ///
+    /// This method is only available when the "debug" feature is enabled.
+    /// It helps detect use-after-rewind errors by checking if the allocation
+    /// was made after the current checkpoint.
+    ///
+    /// # Safety
+    ///
+    /// The reference must be from this arena.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the reference is valid, or `Err(String)` with
+    /// an error message if use-after-rewind is detected.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// #[cfg(feature = "debug")]
+    /// {
+    ///     let arena = Arena::new();
+    ///     let checkpoint = arena.checkpoint();
+    ///     
+    ///     let value = arena.alloc(42u32);
+    ///     
+    ///     // Check validity before rewind
+    ///     unsafe { arena.check_valid(value).unwrap(); }
+    ///     
+    ///     arena.rewind_to_checkpoint(checkpoint);
+    ///     
+    ///     // This will detect use-after-rewind
+    ///     unsafe {
+    ///         assert!(arena.check_valid(value).is_err());
+    ///     }
+    /// }
+    /// ```
+    #[cfg(feature = "debug")]
+    #[inline]
+    pub unsafe fn check_valid<T>(&self, reference: &T) -> Result<(), String> {
+        let arena_id = self as *const Arena as usize;
+        let ptr = reference as *const T as *const u8;
+        let debug_state = debug::DEBUG_STATE.read().unwrap();
+        debug_state.check_use_after_rewind(arena_id, ptr)
+    }
+
+    /// Validates all allocations in the debug state.
+    ///
+    /// This method checks for corruption in the debug tracking system
+    /// and returns detailed information about any issues found.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if all allocations are valid, or `Err(String)` with
+    /// details about any corruption detected.
+    #[cfg(feature = "debug")]
+    #[inline]
+    pub fn validate_debug_state(&self) -> Result<(), String> {
+        let arena_id = self as *const Arena as usize;
+        let debug_state = debug::DEBUG_STATE.read().unwrap();
+        let (total, corrupted) = debug_state.get_stats(arena_id);
+
+        if corrupted > 0 {
+            Err(format!("Found {} corrupted debug guards", corrupted))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Returns lock-free allocation statistics.
+    ///
+    /// This method provides insight into the lock-free allocation performance
+    /// and can help diagnose contention issues. Available only when the "lockfree" feature is enabled.
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple of (allocations, cache_hits, cache_misses, contention_count).
+    #[cfg(feature = "lockfree")]
+    #[inline]
+    pub fn lockfree_stats(&self) -> (usize, usize, usize, usize) {
+        self.lockfree_stats.get_stats()
+    }
+
+    /// Returns debug statistics about allocations and checkpoints.
+    ///
+    /// This method provides insight into the debug tracking system
+    /// and can help diagnose memory safety issues.
+    #[cfg(feature = "debug")]
+    #[inline]
+    pub fn debug_stats(&self) -> DebugStats {
+        let arena_id = self as *const Arena as usize;
+        let debug_state = debug::DEBUG_STATE.read().unwrap();
+        let inner = unsafe { &*self.inner.get() };
+
+        let (total_allocations, corrupted_allocations) = debug_state.get_stats(arena_id);
+
+        DebugStats {
+            total_allocations,
+            active_checkpoints: inner.checkpoints.len(),
+            current_checkpoint_id: debug_state.get_current_checkpoint_id(arena_id),
+            corrupted_allocations,
+        }
+    }
 }
 
 impl Drop for Arena {
@@ -865,7 +2085,7 @@ impl Drop for Arena {
             let inner = &mut *self.inner.get();
             for chunk in &inner.chunks {
                 let layout = Layout::from_size_align(chunk.capacity, CHUNK_ALIGN).unwrap();
-                alloc::dealloc(chunk.ptr.as_ptr(), layout);
+                std::alloc::dealloc(chunk.ptr.as_ptr(), layout);
             }
         }
     }
@@ -875,9 +2095,9 @@ unsafe impl Send for Arena {}
 
 unsafe fn allocate_chunk(capacity: usize) -> Chunk {
     let layout = Layout::from_size_align(capacity, CHUNK_ALIGN).unwrap();
-    let ptr = unsafe { alloc::alloc(layout) };
+    let ptr = unsafe { std::alloc::alloc(layout) };
     if ptr.is_null() {
-        alloc::handle_alloc_error(layout);
+        std::alloc::handle_alloc_error(layout);
     }
     Chunk {
         ptr: unsafe { NonNull::new_unchecked(ptr) },
