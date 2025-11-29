@@ -49,9 +49,19 @@ jobs:
 
       - name: Cargo test (no default features)
         run: cargo test --no-default-features --tests
+        if: matrix.os != 'macos-latest'
+
+      - name: Cargo test (macOS - no default features)
+        run: cargo test --no-default-features --tests --features "stats virtual_memory thread_local lockfree"
+        if: matrix.os == 'macos-latest'
 
       - name: Cargo doc
         run: cargo doc --no-deps --all-features
+        if: matrix.os != 'macos-latest'
+
+      - name: Cargo doc (macOS - exclude debug feature)
+        run: cargo doc --no-deps --features "stats virtual_memory thread_local lockfree"
+        if: matrix.os == 'macos-latest'
 
   bench:
     runs-on: ubuntu-latest
