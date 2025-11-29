@@ -17,7 +17,20 @@ The core type is `arena_b::Arena`, a bump allocator that lets you allocate many 
 - **💾 Virtual Memory**: Reserve/commit pattern using VirtualAlloc/mmap for large allocations
 - **🧵 Thread-Local Caching**: Per-thread allocation buffers for reduced contention
 - **⚡ Lock-Free Optimizations**: Atomic operations for better concurrent performance
+- **📦 Modular Architecture**: Clean separation of concerns with dedicated modules
 - **🔄 100% Backward Compatible**: Drop-in upgrade from v0.4.x
+
+## Architecture
+
+`arena-b` v0.5.0 features a clean, modular architecture:
+
+- **`lib.rs`**: Main module hub with public API exports
+- **`arena.rs`**: Core Arena implementation and public interface
+- **`core.rs`**: Core data structures and utilities
+- **`virtual_memory.rs`**: Virtual memory strategy implementation
+- **`thread_local.rs`**: Thread-local caching functionality
+- **`lockfree.rs`**: Lock-free optimizations
+- **`debug.rs`**: Debug allocation tracking and safety features
 
 ## Installation
 

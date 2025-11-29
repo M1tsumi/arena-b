@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.5.0] - Advanced Features & Performance Release
 
+### 🏗️ Architecture Improvements
+
+- **Modular Codebase**: Complete refactoring of monolithic lib.rs (2363 lines) into clean modules
+  - `arena.rs` - Core Arena implementation and public interface  
+  - `core.rs` - Core data structures and utilities
+  - `virtual_memory.rs` - Virtual memory strategy implementation
+  - `thread_local.rs` - Thread-local caching functionality
+  - `lockfree.rs` - Lock-free optimizations
+  - `debug.rs` - Debug allocation tracking and safety features
+  - Reduced lib.rs by 85% while maintaining 100% backward compatibility
+
 ### 🚀 Major New Features
 
 - **Fast Reset API**: Arena checkpoint functionality for frame-based allocation patterns
