@@ -504,7 +504,8 @@ mod debug {
     #[derive(Debug)]
     pub struct DebugState {
         // Map from arena pointer to its allocation tracking
-        pub allocations: HashMap<usize, HashMap<*mut u8, AllocationInfo>>,
+        // Use usize as key instead of raw pointer to avoid alignment issues
+        pub allocations: HashMap<usize, HashMap<usize, AllocationInfo>>,
         current_checkpoint_ids: HashMap<usize, u64>,
     }
 
@@ -536,7 +537,7 @@ mod debug {
                 checkpoint_id,
                 magic: GUARD_MAGIC,
             };
-            arena_allocations.insert(ptr, info);
+            arena_allocations.insert(ptr as usize, info);
         }
 
         pub fn check_use_after_rewind(
@@ -545,7 +546,7 @@ mod debug {
             ptr: *const u8,
         ) -> Result<(), String> {
             if let Some(arena_allocations) = self.allocations.get(&arena_id) {
-                if let Some(info) = arena_allocations.get(&(ptr as *mut u8)) {
+                if let Some(info) = arena_allocations.get(&(ptr as usize)) {
                     if info.magic != GUARD_MAGIC {
                         return Err(format!("Use after rewind detected at {:p}", ptr));
                     }
