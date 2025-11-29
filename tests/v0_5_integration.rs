@@ -31,13 +31,13 @@ fn test_all_features_integration() {
     // Test thread-local caching (small allocations)
     for i in 0..100 {
         let value = arena.alloc(i);
-        assert_eq!(*value, i as u32);
+        assert_eq!(*value, i);
     }
 
     // Test lock-free optimizations (small-to-medium allocations)
     for i in 100..200 {
         let value = arena.alloc(i);
-        assert_eq!(*value, i as u32);
+        assert_eq!(*value, i);
     }
 
     // Test virtual memory (large allocations)
