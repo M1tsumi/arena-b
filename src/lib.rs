@@ -16,15 +16,6 @@ use std::arch::x86_64::*;
 // v0.5.0: Virtual memory strategy
 #[cfg(feature = "virtual_memory")]
 mod virtual_memory {
-    use super::*;
-
-    #[cfg(windows)]
-    use std::ffi::OsStr;
-    #[cfg(windows)]
-    use std::os::windows::ffi::OsStrExt;
-
-    #[cfg(unix)]
-    use std::os::unix::ffi::OsStrExt;
 
     const PAGE_SIZE: usize = 4096;
     const DEFAULT_RESERVE_SIZE: usize = 16 * 1024 * 1024; // 16MB
@@ -111,7 +102,7 @@ mod virtual_memory {
                 #[cfg(unix)]
                 {
                     let result = libc::mprotect(
-                        self.ptr.add(self.committed_size),
+                        self.ptr.add(self.committed_size) as *mut libc::c_void,
                         commit_size,
                         libc::PROT_READ | libc::PROT_WRITE,
                     );
@@ -139,7 +130,7 @@ mod virtual_memory {
 
                 #[cfg(unix)]
                 {
-                    libc::mprotect(self.ptr.add(offset), decommit_size, libc::PROT_NONE);
+                    libc::mprotect(self.ptr.add(offset) as *mut libc::c_void, decommit_size, libc::PROT_NONE);
                 }
             }
         }
@@ -177,9 +168,7 @@ mod virtual_memory {
 // v0.5.0: Thread-local caching for reduced contention
 #[cfg(feature = "thread_local")]
 mod thread_local_cache {
-    use super::*;
     use std::cell::RefCell;
-    use std::thread::LocalKey;
 
     const THREAD_CACHE_SIZE: usize = 1024; // 1KB per thread
     const MAX_THREAD_CACHE_SIZE: usize = 4096; // 4KB max per thread
@@ -331,7 +320,6 @@ mod thread_local_cache {
 // v0.5.0: Lock-free optimizations for reduced contention
 #[cfg(feature = "lockfree")]
 mod lockfree {
-    use super::*;
     use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 
     // Lock-free per-thread allocation buffer
@@ -462,7 +450,6 @@ mod lockfree {
 
 #[cfg(feature = "debug")]
 mod debug {
-    use super::*;
     use std::collections::HashMap;
     use std::sync::{LazyLock, RwLock};
 
@@ -514,7 +501,7 @@ mod debug {
             let arena_allocations = self
                 .allocations
                 .entry(arena_id)
-                .or_insert_with(HashMap::new);
+                .or_default();
             let info = AllocationInfo {
                 ptr,
                 size,
@@ -711,25 +698,24 @@ impl VirtualChunk {
         let aligned = (current + align - 1) & !(align - 1);
         let end = aligned + size;
 
-        if end <= self.capacity {
-            if self
+        if end <= self.capacity
+            && self
                 .used
                 .compare_exchange_weak(current, end, Ordering::Release, Ordering::Relaxed)
                 .is_ok()
-            {
-                let region = &mut *self.region.get();
-                // Commit memory if needed
-                if end > region.committed_size {
-                    if region.commit(end - region.committed_size).is_ok() {
-                        return Some(region.ptr.add(aligned));
-                    } else {
-                        // Rollback on failure
-                        self.used.store(current, Ordering::Release);
-                        return None;
-                    }
+        {
+            let region = &mut *self.region.get();
+            // Commit memory if needed
+            if end > region.committed_size {
+                if region.commit(end - region.committed_size).is_ok() {
+                    return Some(region.ptr.add(aligned));
+                } else {
+                    // Rollback on failure
+                    self.used.store(current, Ordering::Release);
+                    return None;
                 }
-                return Some(region.ptr.add(aligned));
             }
+            return Some(region.ptr.add(aligned));
         }
         None
     }
@@ -2034,7 +2020,7 @@ impl Arena {
     pub fn validate_debug_state(&self) -> Result<(), String> {
         let arena_id = self as *const Arena as usize;
         let debug_state = debug::DEBUG_STATE.read().unwrap();
-        let (total, corrupted) = debug_state.get_stats(arena_id);
+        let (_total, corrupted) = debug_state.get_stats(arena_id);
 
         if corrupted > 0 {
             Err(format!("Found {} corrupted debug guards", corrupted))
