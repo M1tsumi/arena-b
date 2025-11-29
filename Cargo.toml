@@ -32,6 +32,7 @@ stats = []
 virtual_memory = []
 thread_local = []
 lockfree = []
+debug = []
 
 [[bench]]
 name = "arena_vs_box"
