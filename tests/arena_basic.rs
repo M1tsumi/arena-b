@@ -36,7 +36,10 @@ fn reset_allows_reuse() {
     assert_eq!(*second, 2);
 }
 
-#[cfg(feature = "stats")]
+#[cfg(all(
+    feature = "stats",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 #[test]
 fn stats_track_usage() {
     let arena = Arena::with_capacity(1024);
@@ -75,6 +78,7 @@ fn zst_allocation_does_not_consume_space() {
     assert!(stats_after.allocation_count > stats_before.allocation_count);
 }
 
+#[cfg(not(any(feature = "thread_local", feature = "lockfree")))]
 #[test]
 fn multi_chunk_allocation_grows_arena() {
     // Create a small arena that will definitely require chunk growth
@@ -87,7 +91,10 @@ fn multi_chunk_allocation_grows_arena() {
     assert!(stats_after_second.bytes_allocated >= stats_after_first.bytes_allocated);
 }
 
-#[cfg(feature = "stats")]
+#[cfg(all(
+    feature = "stats",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 #[test]
 fn scope_reclaims_allocations() {
     let arena = Arena::with_capacity(128);

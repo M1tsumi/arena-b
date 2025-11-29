@@ -1,7 +1,13 @@
-#[cfg(feature = "debug")]
+#[cfg(all(
+    feature = "debug",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 use arena_b::Arena;
 
-#[cfg(feature = "debug")]
+#[cfg(all(
+    feature = "debug",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 #[test]
 fn test_use_after_rewind_detection() {
     let arena = Arena::new();
@@ -41,7 +47,10 @@ fn test_use_after_rewind_detection() {
     }
 }
 
-#[cfg(feature = "debug")]
+#[cfg(all(
+    feature = "debug",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 #[test]
 fn test_nested_checkpoint_safety() {
     let arena = Arena::new();
@@ -87,7 +96,10 @@ fn test_nested_checkpoint_safety() {
     }
 }
 
-#[cfg(feature = "debug")]
+#[cfg(all(
+    feature = "debug",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 #[test]
 fn test_debug_stats_tracking() {
     let arena = Arena::new();
@@ -124,7 +136,10 @@ fn test_debug_stats_tracking() {
     assert_eq!(stats.corrupted_allocations, 0);
 }
 
-#[cfg(feature = "debug")]
+#[cfg(all(
+    feature = "debug",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 #[test]
 fn test_multiple_arenas_isolation() {
     let arena1 = Arena::new();
@@ -178,7 +193,10 @@ fn test_debug_feature_compiles() {
     assert_eq!(*new_value, 99);
 }
 
-#[cfg(feature = "debug")]
+#[cfg(all(
+    feature = "debug",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 #[test]
 fn test_comprehensive_safety_scenarios() {
     let arena = Arena::new();

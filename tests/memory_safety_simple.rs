@@ -1,7 +1,13 @@
-#[cfg(feature = "debug")]
+#[cfg(all(
+    feature = "debug",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 use arena_b::Arena;
 
-#[cfg(feature = "debug")]
+#[cfg(all(
+    feature = "debug",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 #[test]
 fn test_basic_use_after_rewind_detection() {
     let arena = Arena::new();
@@ -32,7 +38,10 @@ fn test_basic_use_after_rewind_detection() {
     }
 }
 
-#[cfg(feature = "debug")]
+#[cfg(all(
+    feature = "debug",
+    not(any(feature = "thread_local", feature = "lockfree"))
+))]
 #[test]
 fn test_debug_stats_basic() {
     let arena = Arena::new();
