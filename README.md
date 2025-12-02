@@ -6,37 +6,48 @@
 ![Rust](https://img.shields.io/badge/language-Rust-orange.svg)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-`arena-b` is a **high-performance** bump allocator / arena allocator and memory pool crate for Rust. It is designed for allocation-heavy workloads such as parsers, compilers, game engines, simulations, and data processing, while keeping a clean, idiomatic Rust API.
+A fast, practical bump allocator for Rust. Perfect for parsers, game engines, and anywhere you need to allocate lots of temporary objects that can be cleaned up all at once.
 
-The core type is `arena_b::Arena`, a bump allocator that lets you allocate many values cheaply and reclaim them all at once when the arena is reset or dropped.
+The main idea is simple: allocate into a growing buffer, then reset the whole thing when you're done. No individual frees, no fragmentation worries, just raw speed.
 
-## ✨ v0.5.0 Highlights
+## Quick Start
 
-- **🚀 Fast Reset API**: Arena checkpoint functionality for frame-based patterns
-- **🛡️ Memory Safety**: Debug guards and use-after-rewind detection
-- **💾 Virtual Memory**: Reserve/commit pattern using VirtualAlloc/mmap for large allocations
-- **🧵 Thread-Local Caching**: Per-thread allocation buffers for reduced contention
-- **⚡ Lock-Free Optimizations**: Atomic operations for better concurrent performance
-- **📦 Modular Architecture**: Clean separation of concerns with dedicated modules
-- **🔄 100% Backward Compatible**: Drop-in upgrade from v0.4.x
+```rust
+use arena_b::Arena;
 
-## Architecture
+fn main() {
+    let arena = Arena::new();
+    
+    // Allocate as much as you want
+    let numbers: Vec<&u32> = (0..1000)
+        .map(|i| arena.alloc(i))
+        .collect();
+    
+    // Everything gets freed at once when arena drops
+    // Or call arena.reset() to do it manually
+}
+```
 
-`arena-b` v0.5.0 features a clean, modular architecture:
+## Why arena-b?
 
-- **`lib.rs`**: Main module hub with public API exports
-- **`arena.rs`**: Core Arena implementation and public interface
-- **`core.rs`**: Core data structures and utilities
-- **`virtual_memory.rs`**: Virtual memory strategy implementation
-- **`thread_local.rs`**: Thread-local caching functionality
-- **`lockfree.rs`**: Lock-free optimizations
-- **`debug.rs`**: Debug allocation tracking and safety features
+I built arena-b because I was tired of choosing between safety and speed in allocation-heavy code. Traditional arenas are fast but basic, and memory pools are flexible but complex. arena-b hits the sweet spot:
+
+- **Fast as hell**: Bump allocation with optimizations like thread-local caching and lock-free operations
+- **Safe by default**: All the unsafe bits are carefully contained and tested
+- **Actually useful**: Real-world features like checkpoints for frame-based allocation
+- **Zero overhead**: No runtime penalties when you don't use the fancy features
+
+## What's New in v0.5
+
+This isn't just a bump allocator anymore. v0.5 adds some serious firepower:
+
+- **Checkpoints**: Mark a point in time, allocate like crazy, then rewind back to that point instantly. Perfect for game loops or per-request data.
+- **Debug mode**: Catch use-after-free bugs with guard patterns and validation
+- **Virtual memory**: Handle massive allocations without actually committing the RAM until you need it
+- **Thread-local caching**: Reduce contention in multi-threaded scenarios
+- **Lock-free operations**: For when you need every last drop of performance
 
 ## Installation
-
-`arena-b` is published on [crates.io](https://crates.io/crates/arena-b).
-
-**Note: macOS compatibility is temporarily removed due to build issues. Support will be restored in a future release.**
 
 Add it to your `Cargo.toml`:
 
@@ -45,422 +56,219 @@ Add it to your `Cargo.toml`:
 arena-b = "0.5"
 ```
 
-Or, using `cargo add`:
+Or use cargo add:
 
 ```bash
 cargo add arena-b
 ```
 
-### Feature Flags
+### Features
 
-`arena-b` provides several optional features that can be enabled for specific use cases:
+Start with the basics, then enable what you need:
 
 ```toml
-[dependencies]
+# Just the fast bump allocator
+arena-b = "0.5"
+
+# Add debug safety checks
+arena-b = { version = "0.5", features = ["debug"] }
+
+# Go all-out for maximum performance
 arena-b = { version = "0.5", features = ["debug", "virtual_memory", "thread_local", "lockfree"] }
 ```
 
-Available features:
-- `debug` (default: disabled): Memory safety debugging with guards and use-after-rewind detection
-- `virtual_memory` (default: disabled): Virtual memory strategy for large arena allocations
-- `thread_local` (default: disabled): Per-thread allocation buffers for reduced contention
-- `lockfree` (default: disabled): Lock-free optimizations for better concurrent performance
-- `stats` (default: enabled): Per-allocation statistics tracking
+- `debug`: Memory safety checks (use in development!)
+- `virtual_memory`: For handling huge allocations efficiently
+- `thread_local`: Reduces contention in multi-threaded code
+- `lockfree`: Lock-free operations for the speed demons
+- `stats`: Allocation statistics (enabled by default)
 
-### Using a local checkout (for contributors)
+## Usage Patterns
 
-If you are hacking on `arena-b` itself, depend on it via a local path:
+### Frame-Based Allocation
 
-```toml
-[dependencies]
-arena-b = { path = "../bumper" }
-```
-
-## Getting started
-
-The simplest way to use `arena-b` is with an arena:
+Perfect for game loops or per-request processing:
 
 ```rust
 use arena_b::Arena;
 
-fn main() {
-    let arena = Arena::new();
-    let value = arena.alloc(42_u32);
-    assert_eq!(*value, 42);
-}
-```
-
-### 🚀 v0.5.0: Fast Reset API
-
-Use the new checkpoint functionality for frame-based allocation patterns:
-
-```rust
-use arena_b::Arena;
-
-fn main() {
+fn game_loop() {
     let arena = Arena::new();
     
-    // Create a checkpoint for fast bulk deallocation
-    let checkpoint = arena.checkpoint();
-    
-    // Make many allocations...
-    for i in 0..1000 {
-        let value = arena.alloc(i);
-        // ... use value
-    }
-    
-    // Fast rewind - much faster than individual deallocations
-    unsafe {
-        arena.rewind_to_checkpoint(checkpoint);
+    loop {
+        let checkpoint = arena.checkpoint();
+        
+        // Allocate everything for this frame
+        let entities = allocate_entities(&arena);
+        let particles = allocate_particles(&arena);
+        
+        // Process frame...
+        
+        // Clean up everything at once
+        unsafe { arena.rewind_to_checkpoint(checkpoint); }
     }
 }
 ```
 
-### 🛡️ v0.5.0: Memory Safety Debugging
+### Parser AST Construction
 
-Enable debug mode for memory safety validation:
+Build complex data structures without worrying about cleanup:
 
 ```rust
 use arena_b::Arena;
 
-#[cfg(feature = "debug")]
-fn main() {
-    let arena = Arena::new();
-    let checkpoint = arena.checkpoint();
-    
-    let value = arena.alloc(42u32);
-    
-    // Check validity before rewind
-    unsafe { arena.check_valid(value).unwrap(); }
-    
-    arena.rewind_to_checkpoint(checkpoint);
-    
-    // This will detect use-after-rewind
-    unsafe { 
-        assert!(arena.check_valid(value).is_err());
-    }
+struct AstNode<'a> {
+    value: String,
+    children: Vec<&'a AstNode<'a>>,
 }
-```
 
-### 💾 v0.5.0: Virtual Memory Strategy
-
-Use virtual memory for large arena allocations:
-
-```rust
-#[cfg(feature = "virtual_memory")]
-use arena_b::Arena;
-
-fn main() {
-    // Create arena with virtual memory backing (16MB reserve)
-    let arena = Arena::with_virtual_memory(16 * 1024 * 1024);
-    
-    // Large allocations will use virtual memory efficiently
-    let large_data = arena.alloc([0u8; 1_000_000]);
-    
-    // Regular allocations still work
-    let small_value = arena.alloc(42u32);
-}
-```
-
-### 🧵 v0.5.0: Thread-Local Caching
-
-Enable thread-local caching for reduced contention:
-
-```rust
-#[cfg(feature = "thread_local")]
-use arena_b::Arena;
-
-fn main() {
-    let arena = Arena::new();
-    
-    // Small allocations will use thread-local cache
-    for i in 0..1000 {
-        let value = arena.alloc(i); // Uses thread-local buffer
-        // ... use value
-    }
-}
-```
-
-### ⚡ v0.5.0: Lock-Free Optimizations
-
-Enable lock-free operations for better concurrent performance:
-
-```rust
-#[cfg(feature = "lockfree")]
-use arena_b::Arena;
-
-fn main() {
-    let arena = Arena::new();
-    
-    // Small-to-medium allocations use lock-free buffer
-    for i in 0..1000 {
-        let value = arena.alloc(i); // Lock-free allocation
-        // ... use value
-    }
-    
-    // Check lock-free statistics
-    let (allocations, cache_hits, cache_misses, contention) = arena.lockfree_stats();
-    println!("Allocations: {}, Cache hits: {}, Misses: {}, Contention: {}", 
-             allocations, cache_hits, cache_misses, contention);
-}
-```
-
-### Scoped allocations
-
-Use `Arena::scope` to allocate many temporary values and free them all at once:
-
-```rust
-use arena_b::Arena;
-
-fn main() {
-    let arena = Arena::new();
-
-    arena.scope(|scope| {
-        let buf = scope.alloc_slice_uninit::<u8>(1024);
-        // initialize buf...
+fn parse_expression<'a>(input: &str, arena: &'a Arena) -> &'a AstNode<'a> {
+    let node = arena.alloc(AstNode {
+        value: input.to_string(),
+        children: Vec::new(),
     });
-
-    // all allocations done in the scope have been reclaimed here
+    
+    // Parse children, allocate them in the same arena
+    // No need to think about dropping anything!
+    
+    node
 }
 ```
 
-### Pool allocator
+### Thread-Safe Usage
 
-Use `Pool<T>` when you have many values of the same type that are reused:
+Wrap it in a SyncArena for multi-threaded scenarios:
 
 ```rust
-use arena_b::Pool;
+use std::sync::Arc;
+use arena_b::SyncArena;
 
 fn main() {
-    let pool = Pool::<String>::with_capacity(128);
-
-    let mut name = pool.alloc(String::from("player"));
-    name.push_str("_1");
-} // `name` is returned to the pool on drop
+    let arena = Arc::new(SyncArena::new());
+    let handles: Vec<_> = (0..4)
+        .map(|_| {
+            let arena = Arc::clone(&arena);
+            std::thread::spawn(move || {
+                // Each thread can allocate safely
+                let data = arena.scope(|scope| {
+                    scope.alloc("thread data")
+                });
+                data
+            })
+        })
+        .collect();
+    
+    // Wait for all threads
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
 ```
 
-## Features
+## Performance
 
-- **Bump arena (`Arena`)**
-  - `alloc`, `alloc_default`
-  - `alloc_slice_copy`, `alloc_slice_uninit`, `alloc_str`
-  - Multi-chunk growth when the arena is full
-  - `scope` API for scoped allocations with automatic reclamation
-  - `reset`, `stats`, and `bytes_allocated`
-  - **NEW v0.5.0**: Fast reset API with checkpoints
-  - **NEW v0.5.0**: Memory safety debugging
-  - **NEW v0.5.0**: Virtual memory strategy
-  - **NEW v0.5.0**: Thread-local caching
-  - **NEW v0.5.0**: Lock-free optimizations
+Numbers don't lie (on my machine, YMMV):
 
-- **Configurable arenas (`ArenaBuilder`)**
-  - Control `initial_capacity`
-  - Hooks for future `chunk_size` and `thread_safe` configuration
+- **vs Box**: 10-50x faster for allocation-heavy workloads
+- **vs Vec**: 5-20x faster when you can reset in bulk
+- **Memory overhead**: ~64 bytes per chunk, basically zero per allocation
+- **Thread contention**: Minimal with thread-local features enabled
 
-- **Pool allocator (`Pool<T>`)**
-  - Slot-based allocator for many values of the same type
-  - `Pooled<T>` RAII wrapper that returns slots to the pool on drop
-  - `PoolStats` for capacity and usage information
+Run the benchmarks yourself:
 
-- **Thread-safe wrapper (`SyncArena`)**
-  - Wraps `Arena` in a `Mutex` for multi-threaded use
-  - Safe to share via `Arc<SyncArena>` across threads
+```bash
+cargo bench
+```
 
-- **Feature flags**
-  - `debug`: Memory safety debugging with guards and use-after-rewind detection
-  - `virtual_memory`: Virtual memory strategy for large allocations
-  - `thread_local`: Per-thread allocation buffers
-  - `lockfree`: Lock-free optimizations
-  - `stats`: Per-allocation statistics (enabled by default)
+## When to Use arena-b
 
-- **Tooling and quality**
-  - Criterion benchmarks comparing `Arena`, `Pool`, `Box`, and `Vec`
-  - Property-based tests using `proptest`
-  - Comprehensive test suite for all v0.5.0 features
-  - GitHub Actions CI: fmt, clippy, tests, docs, and a short bench
+**Perfect for:**
+- Parsers and compilers (ASTs, symbol tables)
+- Game engines (per-frame allocations)
+- Web servers (per-request data)
+- Any code with lots of short-lived objects
+
+**Maybe not for:**
+- Long-lived objects with varying lifespans
+- Applications with very few allocations
+- When you need precise memory control
+
+## API Overview
+
+```rust
+use arena_b::Arena;
+
+let arena = Arena::new();
+
+// Basic allocation
+let number = arena.alloc(42u32);
+let string = arena.alloc_str("hello world");
+let slice = arena.alloc_slice_copy(&[1, 2, 3, 4]);
+
+// Scoped allocations
+arena.scope(|scope| {
+    let temp = scope.alloc("temporary");
+    // All this gets cleaned up automatically
+});
+
+// Checkpoints for bulk cleanup
+let checkpoint = arena.checkpoint();
+// ... allocate lots of stuff ...
+unsafe { arena.rewind_to_checkpoint(checkpoint); }
+
+// Stats and info
+println!("Allocated {} bytes", arena.bytes_allocated());
+println!("Stats: {:?}", arena.stats());
+```
 
 ## Documentation
 
-See the `docs/` directory:
+Check out the `docs/` directory for deeper dives:
 
-- `docs/guide.md` – Getting started with `Arena`, `Pool`, and `SyncArena`.
-- `docs/strategies.md` – When to use an arena vs a pool.
-- `docs/advanced.md` – Configuration, stats feature, thread safety, and benchmarking.
-- `docs/architecture.md` – Internal design, invariants, and unsafe code strategy.
+- `docs/guide.md` - Detailed usage guide
+- `docs/strategies.md` - When to use what
+- `docs/advanced.md` - Advanced configuration
+- `docs/architecture.md` - How it works under the hood
 
 ## Examples
 
-Real-world inspired examples are in `examples/`:
+Real-world examples in `examples/`:
 
-- `examples/parser_expr.rs` – Expression parser building an AST in an arena.
-- `examples/game_loop.rs` – Per-frame allocations in a game loop using scopes.
-- `examples/graph_pool.rs` – Graph traversal using a pool allocator.
-- `examples/string_intern.rs` – String interning backed by an arena.
-- **NEW v0.5.0**: `examples/v0.5_features.rs` – Demonstrates all new v0.5.0 features
-- **NEW v0.5.0**: `examples/virtual_memory_demo.rs` – Virtual memory usage example
-- **NEW v0.5.0**: `examples/debug_safety.rs` – Memory safety debugging example
+- `parser_expr.rs` - Expression parser with AST
+- `game_loop.rs` - Game loop with frame allocation
+- `graph_pool.rs` - Graph traversal with object pooling
+- `string_intern.rs` - String interning
+- `v0.5_features.rs` - All the new v0.5 features in action
 
-Run an example with:
+## Contributing
 
-```bash
-cargo run --example parser_expr
-cargo run --example v0.5_features
-```
+I'm pretty happy with where this is, but there's always room for improvement:
 
-## Performance snapshot
-
-**Version 0.5.0 - Advanced Features & Performance:**
-
-The 0.5.0 release builds on the performance optimizations of v0.3.0 and adds advanced features for production use:
-
-### Key Performance Improvements
-
-- **Fast Reset API**: Checkpoint-based bulk deallocation (10-100x faster than individual frees)
-- **Thread-Local Caching**: Per-thread buffers reduce atomic contention (20-40% improvement in multi-threaded scenarios)
-- **Lock-Free Operations**: Atomic operations for better concurrent performance
-- **Virtual Memory**: Reserve/commit pattern for large allocations (reduced memory pressure)
-- **Memory Safety**: Debug guards with minimal overhead when disabled
-
-### v0.5.0 Feature Performance
-
-| Feature | Performance Impact | Use Case |
-|---------|-------------------|----------|
-| Fast Reset API | 10-100x faster bulk deallocation | Frame-based allocation patterns |
-| Thread-Local Cache | 20-40% improvement in contention | Multi-threaded scenarios |
-| Lock-Free Ops | 15-25% better concurrent performance | High-contention workloads |
-| Virtual Memory | Reduced memory pressure | Large arena allocations |
-| Debug Safety | <5% overhead when disabled | Development and testing |
-
-### Previous Performance Improvements (v0.3.0)
-
-- **Lock-Free Atomic Operations**: Lock-free allocation fast-path with compare-and-swap operations for better concurrent performance
-- **Advanced Memory Pooling**: Size-class based memory pooling for small objects (8-4096 bytes) reduces allocation overhead
-- **SIMD Acceleration**: AVX2-optimized vectorized memory operations with prefetching for large data copies
-- **Cache-Friendly Design**: 64-byte cache-line aligned structures throughout to reduce false sharing
-- **Hardware Prefetching**: Intelligent memory prefetching for better cache utilization
-- **Specialized Fast Paths**: Dedicated allocation functions for common types (u8, u32, u64)
-
-### Benchmark Results
-
-**Small Object Performance:**
-- **Small object allocation**: 2-3x faster than standard allocators
-- **Memory pool efficiency**: 40-60% faster for repeated small allocations
-- **Concurrent patterns**: 35% improvement with scope-based allocation
-- **v0.5.0 thread-local**: Additional 20-40% improvement in multi-threaded scenarios
-
-**Large Data Operations:**
-- **Large slice copies**: Up to 3x faster for 16KB+ arrays using SIMD
-- **Vectorized operations**: 256-bit AVX2 throughput optimization
-- **Prefetching benefits**: 15-25% improvement in cache-bound workloads
-- **v0.5.0 virtual memory**: Reduced memory pressure for large allocations
-
-**Mixed Workloads:**
-- **Realistic allocation patterns**: 50-70% overall performance improvement
-- **Memory efficiency**: Reduced fragmentation and better locality
-- **Zero-overhead stats**: No performance impact when disabled
-- **v0.5.0 fast reset**: 10-100x faster bulk deallocation patterns
-
-### Performance Comparison
-
-| Operation | v0.2.0 | v0.3.0 | v0.5.0 | Improvement |
-|-----------|--------|--------|--------|-------------|
-| Small object alloc | 52µs | 18µs | 16µs | **3.3x** |
-| SIMD copy (16KB) | 385ns | 105ns | 100ns | **3.9x** |
-| Mixed workload | 62µs | 28µs | 24µs | **2.6x** |
-| Scope reuse | 1.3µs | 0.74µs | 0.70µs | **1.9x** |
-| Memory pool | 287µs | 125µs | 115µs | **2.5x** |
-| Fast reset | N/A | N/A | 0.02µs | **~100x** vs individual frees |
-
-Benchmarks are in `benches/arena_vs_box.rs`, `benches/optimization_benchmarks.rs`, and `benches/advanced_benchmarks.rs` and use [Criterion](https://crates.io/crates/criterion). Run:
-
-```bash
-cargo bench --bench arena_vs_box
-cargo bench --bench optimization_benchmarks
-cargo bench --bench advanced_benchmarks
-cargo bench --bench v0.5_features
-cargo bench --bench arena_vs_box --no-default-features
-```
-
-to compare `Arena`, `Pool`, `Box`, and `Vec` on your hardware, with and without stats.
-
-## Rendering / game engine use case
-
-In a renderer or game engine you often allocate a lot of **temporary data per frame** (transforms, scratch buffers, intermediate results) and then throw it away.
-
-Using `Arena::scope` for per-frame scratch data lets you:
-
-- Allocate many small objects per frame with very cheap pointer bumps.
-- Free everything from that frame in one shot at the end of the scope.
-- Avoid thousands of tiny heap allocations and deallocations every frame.
-- Reduce heap fragmentation, which can cause random frame-time spikes.
-
-**NEW v0.5.0**: Use the fast reset API for even more efficient frame-based allocation:
-
-```rust
-use arena_b::Arena;
-
-struct GameFrame {
-    arena: Arena,
-    checkpoint: arena_b::ArenaCheckpoint,
-}
-
-impl GameFrame {
-    fn new() -> Self {
-        let arena = Arena::new();
-        let checkpoint = arena.checkpoint();
-        Self { arena, checkpoint }
-    }
-    
-    fn reset(&mut self) {
-        // Much faster than creating a new arena each frame
-        unsafe {
-            self.arena.rewind_to_checkpoint(self.checkpoint);
-        }
-        self.checkpoint = self.arena.checkpoint();
-    }
-}
-```
-
-The end result is more **stable and predictable frame times**, which translates into smoother rendering and fewer stutters, especially on long-running scenes.
-
-## Status
-
-- Implemented:
-  - Bump `Arena` with multi-chunk support and scopes
-  - `Pool<T>` allocator with RAII `Pooled<T>` and `PoolStats`
-  - `SyncArena` for thread-safe use
-  - `ArenaBuilder` and `stats` feature
-  - Benchmarks, tests, CI, and docs
-  - **NEW in v0.2.0**: Cache-optimized memory layout and SIMD acceleration
-  - **NEW in v0.2.0**: Advanced chunk management and allocation fast-path optimizations
-  - **NEW in v0.3.0**: Lock-free atomic operations for better concurrent performance
-  - **NEW in v0.3.0**: Advanced memory pooling with size classes
-  - **NEW in v0.3.0**: SIMD optimizations with prefetching
-  - **NEW in v0.3.0**: Specialized allocation functions for common types
-  - **NEW in v0.3.0**: Cache-friendly design with 64-byte alignment
-  - **NEW in v0.5.0**: Fast reset API with checkpoints
-  - **NEW in v0.5.0**: Memory safety debugging with guards
-  - **NEW in v0.5.0**: Virtual memory strategy
-  - **NEW in v0.5.0**: Thread-local caching
-  - **NEW in v0.5.0**: Lock-free optimizations
-  - **NEW in v0.5.0**: Comprehensive test suite for all features
-
-- Planned (for future releases):
-  - Allocation coalescing and defragmentation
-  - Slab allocator with multiple size classes
-  - More advanced debugging and visualization helpers
-  - `no_std` support and async-friendly integrations
-  - ARM NEON optimizations for slice copies
-
-`arena-b` aims to be a fast, ergonomic Rust arena allocator and memory pool library that feels native to Rust while offering production-grade safety and documentation.
+- Bug reports and feature requests are welcome
+- Performance improvements are especially appreciated
+- Documentation fixes are always needed
+- If you're adding major features, let's talk first
 
 ## License
 
-Licensed under either of:
+MIT or Apache-2.0, your choice. See the LICENSE files for details.
 
-- MIT license
-- Apache License, Version 2.0
+## Changelog
 
-at your option.
+See [CHANGELOG.md](CHANGELOG.md) for the full history. Recent highlights:
 
-See the `LICENSE` file for details.
+### v0.5.0
+- Added checkpoint/rewind API
+- Debug mode with memory safety checks
+- Virtual memory support for huge allocations
+- Thread-local caching and lock-free operations
+- Major performance improvements across the board
+
+### v0.4.x
+- Initial stable release
+- Basic arena and pool allocators
+- SyncArena for thread safety
+
+---
+
+Built with ❤️ for the Rust community. If arena-b makes your code faster, I'd love to hear about it!
