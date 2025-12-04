@@ -1,6 +1,6 @@
 [package]
 name = "arena-b"
-version = "0.5.7"
+version = "0.6.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Ultra-fast bump allocation arena with specialized allocation methods for parsers, game engines, and data processing"
