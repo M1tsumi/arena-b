@@ -8,6 +8,7 @@
 #![allow(clippy::let_and_return)]
 #![allow(clippy::collapsible_else_if)]
 
+use cfg_if::cfg_if;
 use std::alloc::{alloc, dealloc, Layout};
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
@@ -164,6 +165,10 @@ mod virtual_memory {
                 self.decommit(0, self.committed_size);
                 self.committed_size = 0;
             }
+        }
+
+        pub fn committed_bytes(&self) -> usize {
+            self.committed_size
         }
     }
 
@@ -596,6 +601,12 @@ mod debug {
             }
         }
     }
+
+    pub fn rewind_arena_to_checkpoint(arena_id: usize, checkpoint_id: u64) {
+        if let Ok(mut state) = DEBUG_STATE.write() {
+            state.rewind_to_checkpoint(arena_id, checkpoint_id);
+        }
+    }
 }
 
 const CHUNK_ALIGN: usize = 64;
@@ -604,6 +615,14 @@ const MIN_CHUNK_SIZE: usize = 4096;
 const MAX_CHUNK_SIZE: usize = 16 * 1024 * 1024;
 const ALIGNMENT_MASK: usize = CHUNK_ALIGN - 1;
 const SIMD_THRESHOLD: usize = 1024;
+
+cfg_if! {
+    if #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))] {
+        const HAS_NATIVE_SIMD: bool = true;
+    } else {
+        const HAS_NATIVE_SIMD: bool = false;
+    }
+}
 
 // Fast-path optimizations
 const FAST_ALLOC_THRESHOLD: usize = 1024; // Fast path for small allocations
@@ -755,6 +774,11 @@ impl VirtualChunk {
         region.reset();
         self.used.store(0, Ordering::Release);
     }
+
+    fn committed_bytes(&self) -> usize {
+        let region = unsafe { &*self.region.get() };
+        region.committed_bytes()
+    }
 }
 
 #[repr(C, align(64))]
@@ -834,6 +858,67 @@ pub struct ArenaBuilder {
 pub struct Scope<'scope, 'arena> {
     arena: &'arena Arena,
     _marker: PhantomData<&'scope mut ()>,
+}
+
+struct ScopeResetGuard<'a> {
+    arena: &'a Arena,
+    start_chunk: usize,
+    start_used: usize,
+    #[cfg(feature = "stats")]
+    start_bytes_used: usize,
+    #[cfg(feature = "stats")]
+    start_allocation_count: usize,
+}
+
+impl<'a> ScopeResetGuard<'a> {
+    unsafe fn capture(arena: &'a Arena) -> Self {
+        let inner = &mut *arena.inner.get();
+        let idx = inner.current_chunk.load(Ordering::Acquire);
+        let used = inner.chunks[idx].used.load(Ordering::Acquire);
+
+        Self {
+            arena,
+            start_chunk: idx,
+            start_used: used,
+            #[cfg(feature = "stats")]
+            start_bytes_used: arena.stats.bytes_used.load(Ordering::Acquire),
+            #[cfg(feature = "stats")]
+            start_allocation_count: arena.stats.allocation_count.load(Ordering::Acquire),
+        }
+    }
+}
+
+impl Drop for ScopeResetGuard<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            #[cfg(feature = "stats")]
+            {
+                self.arena
+                    .stats
+                    .bytes_used
+                    .store(self.start_bytes_used, Ordering::Release);
+                self.arena
+                    .stats
+                    .allocation_count
+                    .store(self.start_allocation_count, Ordering::Release);
+            }
+
+            let inner = &mut *self.arena.inner.get();
+            for (idx, chunk) in inner.chunks.iter_mut().enumerate() {
+                if idx < self.start_chunk {
+                    continue;
+                }
+                if idx == self.start_chunk {
+                    chunk.used.store(self.start_used, Ordering::Release);
+                } else {
+                    chunk.used.store(0, Ordering::Release);
+                }
+            }
+            inner
+                .current_chunk
+                .store(self.start_chunk, Ordering::Release);
+        }
+    }
 }
 
 impl<'scope, 'arena> Scope<'scope, 'arena>
@@ -1303,8 +1388,14 @@ impl Arena {
 
         // Use relaxed ordering for better performance in single-threaded scenarios
         let current = chunk.used.load(Ordering::Relaxed);
-        let aligned = (current + align - 1) & !(align - 1);
-        let end = aligned + size;
+        let aligned = match align_up_checked(current, align) {
+            Some(v) => v,
+            None => return self.allocate_raw(layout),
+        };
+        let end = match aligned.checked_add(size) {
+            Some(v) => v,
+            None => return self.allocate_raw(layout),
+        };
 
         if likely(end <= chunk.capacity) {
             // Fast-path: single atomic operation with relaxed ordering
@@ -1497,13 +1588,33 @@ impl Arena {
             let ptr = self.allocate_raw(layout).cast::<T>();
             // Use optimized copy for large slices
             let total_bytes = mem::size_of_val(slice);
-            if total_bytes >= SIMD_THRESHOLD
-                && cfg!(any(target_arch = "x86_64", target_arch = "aarch64"))
-            {
+            if total_bytes >= SIMD_THRESHOLD && HAS_NATIVE_SIMD {
                 self.copy_large_slice_optimized(slice.as_ptr(), ptr, len, total_bytes);
             } else {
                 ptr::copy_nonoverlapping(slice.as_ptr(), ptr, len);
             }
+            slice::from_raw_parts(ptr, len)
+        }
+    }
+
+    /// Fast-path allocation for small slices that benefits from reduced allocator overhead.
+    #[inline]
+    pub fn alloc_slice_fast<T: Copy>(&self, slice: &[T]) -> &[T] {
+        if slice.is_empty() {
+            self.record_allocation(0);
+            return unsafe { slice::from_raw_parts(NonNull::<T>::dangling().as_ptr(), 0) };
+        }
+
+        let total_bytes = mem::size_of_val(slice);
+        if total_bytes > FAST_ALLOC_THRESHOLD {
+            return self.alloc_slice_copy(slice);
+        }
+
+        let len = slice.len();
+        let layout = Layout::array::<T>(len).unwrap();
+        unsafe {
+            let ptr = self.allocate_fast_path(layout).cast::<T>();
+            ptr::copy_nonoverlapping(slice.as_ptr(), ptr, len);
             slice::from_raw_parts(ptr, len)
         }
     }
@@ -1620,53 +1731,37 @@ impl Arena {
         unsafe { std::str::from_utf8_unchecked(bytes) }
     }
 
+    /// Allocates a mutable UTF-8 buffer initialized with `\0` bytes.
+    ///
+    /// Callers can mutate the returned string via [`str::as_bytes_mut`] to
+    /// write valid UTF-8 data without any extra allocations or copies.
+    #[inline]
+    pub fn alloc_str_uninit(&self, len: usize) -> &mut str {
+        let buffer = self.alloc_slice_uninit::<u8>(len);
+        for slot in buffer.iter_mut() {
+            slot.write(0);
+        }
+
+        unsafe {
+            let ptr = buffer.as_mut_ptr() as *mut u8;
+            let bytes = std::slice::from_raw_parts_mut(ptr, buffer.len());
+            std::str::from_utf8_unchecked_mut(bytes)
+        }
+    }
+
     pub fn scope<'arena, F, R>(&'arena self, f: F) -> R
     where
         F: for<'scope> FnOnce(&Scope<'scope, 'arena>) -> R,
     {
         unsafe {
-            let (start_chunk, start_used) = {
-                let inner = &mut *self.inner.get();
-                let idx = inner.current_chunk.load(Ordering::Acquire);
-                (idx, inner.chunks[idx].used.load(Ordering::Acquire))
-            };
-
-            #[cfg(feature = "stats")]
-            let start_bytes_used = self.stats.bytes_used.load(Ordering::Acquire);
-            #[cfg(feature = "stats")]
-            let start_allocation_count = self.stats.allocation_count.load(Ordering::Acquire);
+            let _guard = ScopeResetGuard::capture(self);
 
             let scope = Scope {
                 arena: self,
                 _marker: PhantomData,
             };
 
-            let result = f(&scope);
-
-            #[cfg(feature = "stats")]
-            {
-                self.stats
-                    .bytes_used
-                    .store(start_bytes_used, Ordering::Release);
-                self.stats
-                    .allocation_count
-                    .store(start_allocation_count, Ordering::Release);
-            }
-
-            let inner = &mut *self.inner.get();
-            for (idx, chunk) in inner.chunks.iter_mut().enumerate() {
-                if idx < start_chunk {
-                    continue;
-                }
-                if idx == start_chunk {
-                    chunk.used.store(start_used, Ordering::Release);
-                } else {
-                    chunk.used.store(0, Ordering::Release);
-                }
-            }
-            inner.current_chunk.store(start_chunk, Ordering::Release);
-
-            result
+            f(&scope)
         }
     }
 
@@ -1683,6 +1778,13 @@ impl Arena {
             chunk.used.store(0, Ordering::Release);
         }
         inner.current_chunk.store(0, Ordering::Release);
+
+        #[cfg(feature = "virtual_memory")]
+        {
+            if let Some(ref mut vchunk) = inner.virtual_chunk {
+                vchunk.reset();
+            }
+        }
 
         #[cfg(feature = "stats")]
         {
@@ -1920,13 +2022,18 @@ impl Arena {
                     && cp.chunk_offset <= checkpoint.chunk_offset)
         });
 
-        // v0.5.0: Debug tracking for use-after-rewind detection
+        #[cfg(feature = "virtual_memory")]
+        {
+            if let Some(ref mut vchunk) = inner.virtual_chunk {
+                vchunk.reset();
+            }
+        }
+
         #[cfg(feature = "debug")]
         {
             let arena_id = self as *const Arena as usize;
-            let mut debug_state = debug::DEBUG_STATE.write().unwrap();
-            debug_state.rewind_to_checkpoint(arena_id, checkpoint.checkpoint_id);
-            inner.current_checkpoint_id = checkpoint.checkpoint_id + 1;
+            crate::debug::rewind_arena_to_checkpoint(arena_id, checkpoint.checkpoint_id);
+            (*self.inner.get()).current_checkpoint_id = checkpoint.checkpoint_id + 1;
         }
 
         // v0.5.0: Reset thread-local cache on rewind
@@ -2085,6 +2192,21 @@ impl Arena {
         self.lockfree_stats.get_stats()
     }
 
+    /// Returns the number of bytes currently committed in the virtual memory region.
+    ///
+    /// Available only when the `virtual_memory` feature is enabled and the arena
+    /// was constructed via [`Arena::with_virtual_memory`]. Returns `None` for
+    /// arenas without virtual memory backing.
+    #[cfg(feature = "virtual_memory")]
+    #[inline]
+    pub fn virtual_memory_committed_bytes(&self) -> Option<usize> {
+        let inner = unsafe { &*self.inner.get() };
+        inner
+            .virtual_chunk
+            .as_ref()
+            .map(|chunk| chunk.committed_bytes())
+    }
+
     /// Returns debug statistics about allocations and checkpoints.
     ///
     /// This method provides insight into the debug tracking system
@@ -2157,6 +2279,15 @@ fn next_chunk_capacity_optimized(prev_capacity: usize, size: usize, align: usize
 #[allow(dead_code)]
 fn next_chunk_capacity(prev_capacity: usize, layout: &Layout) -> usize {
     next_chunk_capacity_optimized(prev_capacity, layout.size(), layout.align())
+}
+
+#[inline]
+fn align_up_checked(value: usize, align: usize) -> Option<usize> {
+    if align <= 1 {
+        return Some(value);
+    }
+    let mask = align.checked_sub(1)?;
+    value.checked_add(mask).map(|v| v & !mask)
 }
 
 #[inline]

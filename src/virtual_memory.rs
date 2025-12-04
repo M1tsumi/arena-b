@@ -9,6 +9,7 @@ use core::ffi::OsStrExt;
 const PAGE_SIZE: usize = 4096;
 const DEFAULT_RESERVE_SIZE: usize = 16 * 1024 * 1024; // 16MB
 const DEFAULT_COMMIT_SIZE: usize = 64 * 1024; // 64KB
+const MAX_RESERVE_SIZE: usize = 4 * 1024 * 1024 * 1024; // 4GB safe default
 
 // Virtual memory region using reserve/commit pattern
 pub struct VirtualMemoryRegion {
@@ -19,18 +20,19 @@ pub struct VirtualMemoryRegion {
 
 impl VirtualMemoryRegion {
     pub fn new(reserve_size: usize) -> Result<Self, &'static str> {
+        let reserve_size = reserve_size.clamp(PAGE_SIZE, MAX_RESERVE_SIZE);
         let reserve_size = (reserve_size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
 
         let ptr = unsafe {
             #[cfg(windows)]
             {
                 use windows_sys::Win32::System::Memory::{
-                    VirtualAlloc, MEM_RESERVE, PAGE_READWRITE
+                    VirtualAlloc, MEM_RESERVE, MEM_TOP_DOWN, PAGE_READWRITE
                 };
                 VirtualAlloc(
                     ptr::null_mut(),
                     reserve_size,
-                    MEM_RESERVE,
+                    MEM_RESERVE | MEM_TOP_DOWN,
                     PAGE_READWRITE,
                 )
             }
@@ -75,7 +77,7 @@ impl VirtualMemoryRegion {
             #[cfg(windows)]
             {
                 use windows_sys::Win32::System::Memory::{
-                    VirtualAlloc, MEM_COMMIT, PAGE_READWRITE
+                    VirtualAlloc, GetLastError, MEM_COMMIT, PAGE_READWRITE
                 };
                 let result = VirtualAlloc(
                     commit_ptr as *mut _,
@@ -84,7 +86,13 @@ impl VirtualMemoryRegion {
                     PAGE_READWRITE,
                 );
                 if result.is_null() {
-                    return Err("Failed to commit virtual memory");
+                    let err = unsafe { GetLastError() };
+                    return Err(match err {
+                        windows_sys::Win32::Foundation::ERROR_NOT_ENOUGH_MEMORY => {
+                            "Insufficient virtual memory during commit"
+                        }
+                        _ => "Failed to commit virtual memory",
+                    });
                 }
             }
             #[cfg(unix)]
@@ -96,6 +104,15 @@ impl VirtualMemoryRegion {
                 );
                 if result != 0 {
                     return Err("Failed to commit virtual memory");
+                }
+
+                #[cfg(target_os = "macos")]
+                unsafe {
+                    libc::pthread_jit_write_protect_np(0);
+                }
+                #[cfg(target_os = "macos")]
+                unsafe {
+                    libc::pthread_jit_write_protect_np(1);
                 }
             }
         }
@@ -120,11 +137,11 @@ impl VirtualMemoryRegion {
         unsafe {
             #[cfg(windows)]
             {
-                use windows_sys::Win32::System::Memory::VirtualFree;
+                use windows_sys::Win32::System::Memory::{VirtualFree, MEM_DECOMMIT};
                 let result = VirtualFree(
                     decommit_ptr as *mut _,
                     size,
-                    windows_sys::Win32::System::Memory::MEM_DECOMMIT,
+                    MEM_DECOMMIT,
                 );
                 if result == 0 {
                     return Err("Failed to decommit virtual memory");
@@ -144,11 +161,11 @@ impl VirtualMemoryRegion {
                 // Also discard the pages to free physical memory
                 #[cfg(target_os = "macos")]
                 {
-                    libc::madvice(decommit_ptr, size, libc::MADV_FREE);
+                    libc::madvise(decommit_ptr, size, libc::MADV_FREE);
                 }
                 #[cfg(not(target_os = "macos"))]
                 {
-                    libc::madvice(decommit_ptr, size, libc::MADV_DONTNEED);
+                    libc::madvise(decommit_ptr, size, libc::MADV_DONTNEED);
                 }
             }
         }
@@ -164,7 +181,12 @@ impl VirtualMemoryRegion {
     pub fn reset(&mut self) {
         if self.committed_size > 0 {
             let _ = self.decommit(0, self.committed_size);
+            self.committed_size = 0;
         }
+    }
+
+    pub fn committed_bytes(&self) -> usize {
+        self.committed_size
     }
 }
 

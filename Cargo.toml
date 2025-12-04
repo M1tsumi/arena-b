@@ -16,6 +16,8 @@ name = "arena_b"
 path = "src/lib.rs"
 
 [dependencies]
+cfg-if = "1.0"
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_System_Memory"] }
 
@@ -49,3 +51,7 @@ harness = false
 [[bench]]
 name = "v0_4_0_benchmarks"
 harness = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

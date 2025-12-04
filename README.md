@@ -4,11 +4,13 @@
 [![Docs.rs](https://docs.rs/arena-b/badge.svg)](https://docs.rs/arena-b)
 [![CI](https://github.com/M1tsumi/arena-b/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/M1tsumi/arena-b/actions/workflows/ci.yml)
 ![Rust](https://img.shields.io/badge/language-Rust-orange.svg)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 
-A fast, practical bump allocator for Rust. Perfect for parsers, game engines, and anywhere you need to allocate lots of temporary objects that can be cleaned up all at once.
+A high-performance bump allocator for Rust, designed for scenarios where you need to allocate many temporary objects and deallocate them all at once. Ideal for parsers, game engines, compilers, and request-scoped web server data.
 
-The main idea is simple: allocate into a growing buffer, then reset the whole thing when you're done. No individual frees, no fragmentation worries, just raw speed.
+## Overview
+
+Arena allocation follows a simple principle: allocate objects sequentially into a contiguous buffer, then free everything simultaneously when the arena is reset or dropped. This approach eliminates per-object deallocation overhead and avoids memory fragmentation entirely.
 
 ## Quick Start
 
@@ -18,76 +20,84 @@ use arena_b::Arena;
 fn main() {
     let arena = Arena::new();
     
-    // Allocate as much as you want
+    // Allocate objects into the arena
     let numbers: Vec<&u32> = (0..1000)
         .map(|i| arena.alloc(i))
         .collect();
     
-    // Everything gets freed at once when arena drops
-    // Or call arena.reset() to do it manually
+    // All allocations are freed when the arena is dropped
+    // Alternatively, call arena.reset() to free manually
 }
 ```
 
-## Why arena-b?
+## Features
 
-I built arena-b because I was tired of choosing between safety and speed in allocation-heavy code. Traditional arenas are fast but basic, and memory pools are flexible but complex. arena-b hits the sweet spot:
+- **High Performance**: Bump allocation with thread-local caching and lock-free fast paths
+- **Memory Safety**: Unsafe internals are carefully encapsulated and thoroughly tested
+- **Checkpoint API**: Save and restore allocation state for frame-based or request-scoped patterns
+- **Zero-Cost Abstractions**: Optional features incur no overhead when disabled
+- **Advanced Debugging** *(v0.6)*: Leak detection, validation hooks, and optional backtraces make it easier to audit arena usage during development
+- **Virtual Memory Instrumentation** *(v0.6)*: Inspect committed bytes at runtime and rely on improved macOS/Windows handling for large reserves
 
-- **Fast as hell**: Bump allocation with optimizations like thread-local caching and lock-free operations
-- **Safe by default**: All the unsafe bits are carefully contained and tested
-- **Actually useful**: Real-world features like checkpoints for frame-based allocation
-- **Zero overhead**: No runtime penalties when you don't use the fancy features
+## What's New in v0.6
+
+- **New Allocation APIs**: `alloc_slice_fast` accelerates small slice copies and `alloc_str_uninit` creates mutable UTF-8 buffers without extra allocations.
+- **Virtual Memory Telemetry**: `virtual_memory_committed_bytes()` reports the current committed footprint, while rewinds/resets now guarantee proper decommit on every platform.
+- **Lock-Free Overhaul**: Per-thread slab caches reduce contention and eliminate previously observed race conditions in the lock-free buffer.
+- **Panic-Safe Scopes**: `Arena::scope` now rolls back automatically even if the scoped closure unwinds, ensuring arenas remain consistent under failure.
+- **Enhanced Debugging**: Runtime validation hooks, leak reports, and optional `debug_backtrace` capture provide deep diagnostics when the `debug` feature is enabled.
 
 ## What's New in v0.5
 
-This isn't just a bump allocator anymore. v0.5 adds some serious firepower:
-
-- **Checkpoints**: Mark a point in time, allocate like crazy, then rewind back to that point instantly. Perfect for game loops or per-request data.
-- **Debug mode**: Catch use-after-free bugs with guard patterns and validation
-- **Virtual memory**: Handle massive allocations without actually committing the RAM until you need it
-- **Thread-local caching**: Reduce contention in multi-threaded scenarios
-- **Lock-free operations**: For when you need every last drop of performance
+- **Checkpoints**: Mark allocation points and rewind instantly for bulk deallocation
+- **Debug Mode**: Detect use-after-free bugs with guard patterns and pointer validation
+- **Virtual Memory**: Reserve large address spaces without committing physical memory upfront
+- **Thread-Local Caching**: Reduce lock contention in multi-threaded workloads
+- **Lock-Free Operations**: Minimize synchronization overhead in high-contention scenarios
 
 ## Installation
 
-Add it to your `Cargo.toml`:
+Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 arena-b = "0.5"
 ```
 
-Or use cargo add:
+Or via the command line:
 
 ```bash
 cargo add arena-b
 ```
 
-### Features
+### Feature Flags
 
-Start with the basics, then enable what you need:
+Enable features based on your requirements:
 
 ```toml
-# Just the fast bump allocator
+# Basic bump allocator
 arena-b = "0.5"
 
-# Add debug safety checks
+# With debug safety checks (recommended for development)
 arena-b = { version = "0.5", features = ["debug"] }
 
-# Go all-out for maximum performance
+# Full feature set for maximum performance
 arena-b = { version = "0.5", features = ["debug", "virtual_memory", "thread_local", "lockfree"] }
 ```
 
-- `debug`: Memory safety checks (use in development!)
-- `virtual_memory`: For handling huge allocations efficiently
-- `thread_local`: Reduces contention in multi-threaded code
-- `lockfree`: Lock-free operations for the speed demons
-- `stats`: Allocation statistics (enabled by default)
+| Feature | Description |
+|---------|-------------|
+| `debug` | Memory safety validation and use-after-free detection |
+| `virtual_memory` | Efficient handling of large allocations via reserve/commit |
+| `thread_local` | Per-thread allocation buffers to reduce contention |
+| `lockfree` | Lock-free operations for concurrent workloads |
+| `stats` | Allocation statistics tracking (enabled by default) |
 
-## Usage Patterns
+## Usage Examples
 
 ### Frame-Based Allocation
 
-Perfect for game loops or per-request processing:
+Suitable for game loops or per-request processing:
 
 ```rust
 use arena_b::Arena;
@@ -98,21 +108,21 @@ fn game_loop() {
     loop {
         let checkpoint = arena.checkpoint();
         
-        // Allocate everything for this frame
+        // Allocate frame-specific data
         let entities = allocate_entities(&arena);
         let particles = allocate_particles(&arena);
         
-        // Process frame...
+        // Process the frame...
         
-        // Clean up everything at once
+        // Deallocate all frame data at once
         unsafe { arena.rewind_to_checkpoint(checkpoint); }
     }
 }
 ```
 
-### Parser AST Construction
+### AST Construction for Parsers
 
-Build complex data structures without worrying about cleanup:
+Build complex data structures without manual memory management:
 
 ```rust
 use arena_b::Arena;
@@ -128,16 +138,16 @@ fn parse_expression<'a>(input: &str, arena: &'a Arena) -> &'a AstNode<'a> {
         children: Vec::new(),
     });
     
-    // Parse children, allocate them in the same arena
-    // No need to think about dropping anything!
+    // Child nodes are allocated in the same arena
+    // All memory is freed when the arena is dropped
     
     node
 }
 ```
 
-### Thread-Safe Usage
+### Thread-Safe Allocation
 
-Wrap it in a SyncArena for multi-threaded scenarios:
+Use `SyncArena` for concurrent access:
 
 ```rust
 use std::sync::Arc;
@@ -145,36 +155,34 @@ use arena_b::SyncArena;
 
 fn main() {
     let arena = Arc::new(SyncArena::new());
+    
     let handles: Vec<_> = (0..4)
         .map(|_| {
             let arena = Arc::clone(&arena);
             std::thread::spawn(move || {
-                // Each thread can allocate safely
-                let data = arena.scope(|scope| {
-                    scope.alloc("thread data")
-                });
-                data
+                arena.scope(|scope| {
+                    scope.alloc("thread-local data")
+                })
             })
         })
         .collect();
     
-    // Wait for all threads
     for handle in handles {
         handle.join().unwrap();
     }
 }
 ```
 
-## Performance
+## Performance Characteristics
 
-Numbers don't lie (on my machine, YMMV):
+Typical performance improvements over standard allocation:
 
-- **vs Box**: 10-50x faster for allocation-heavy workloads
-- **vs Vec**: 5-20x faster when you can reset in bulk
-- **Memory overhead**: ~64 bytes per chunk, basically zero per allocation
-- **Thread contention**: Minimal with thread-local features enabled
+- **vs `Box`**: 10–50× faster for allocation-intensive workloads
+- **vs `Vec`**: 5–20× faster when bulk reset is applicable
+- **Memory overhead**: ~64 bytes per chunk; negligible per-allocation overhead
+- **Thread contention**: Minimal when thread-local features are enabled
 
-Run the benchmarks yourself:
+Run benchmarks locally:
 
 ```bash
 cargo bench
@@ -182,18 +190,18 @@ cargo bench
 
 ## When to Use arena-b
 
-**Perfect for:**
-- Parsers and compilers (ASTs, symbol tables)
-- Game engines (per-frame allocations)
-- Web servers (per-request data)
-- Any code with lots of short-lived objects
+**Recommended Use Cases:**
+- Parsers and compilers (ASTs, intermediate representations)
+- Game engines (per-frame temporary allocations)
+- Web servers (per-request data structures)
+- Any workload with many short-lived objects
 
-**Maybe not for:**
-- Long-lived objects with varying lifespans
-- Applications with very few allocations
-- When you need precise memory control
+**Less Suitable For:**
+- Long-lived objects with heterogeneous lifetimes
+- Applications with minimal allocation requirements
+- Scenarios requiring fine-grained memory control
 
-## API Overview
+## API Reference
 
 ```rust
 use arena_b::Arena;
@@ -203,72 +211,76 @@ let arena = Arena::new();
 // Basic allocation
 let number = arena.alloc(42u32);
 let string = arena.alloc_str("hello world");
-let slice = arena.alloc_slice_copy(&[1, 2, 3, 4]);
+let small = arena.alloc_slice_fast(&[1u8, 2, 3]);
+let buf = arena.alloc_str_uninit(256); // mutable UTF-8 buffer
 
-// Scoped allocations
+// Scoped allocation with automatic cleanup (panic-safe)
 arena.scope(|scope| {
-    let temp = scope.alloc("temporary");
-    // All this gets cleaned up automatically
+    let temp = scope.alloc("temporary data");
+    // Automatically rewound even if this closure panics
+    assert_eq!(temp, &"temporary data");
 });
 
-// Checkpoints for bulk cleanup
+// Checkpoint-based bulk deallocation
 let checkpoint = arena.checkpoint();
-// ... allocate lots of stuff ...
+// ... perform allocations ...
 unsafe { arena.rewind_to_checkpoint(checkpoint); }
 
-// Stats and info
-println!("Allocated {} bytes", arena.bytes_allocated());
+// Virtual memory telemetry (feature = "virtual_memory")
+#[cfg(feature = "virtual_memory")]
+if let Some(bytes) = arena.virtual_memory_committed_bytes() {
+    println!("Currently committed: {} bytes", bytes);
+}
+
+// Statistics
+println!("Allocated: {} bytes", arena.bytes_allocated());
 println!("Stats: {:?}", arena.stats());
 ```
 
 ## Documentation
 
-Check out the `docs/` directory for deeper dives:
+Additional documentation is available in the `docs/` directory:
 
-- `docs/guide.md` - Detailed usage guide
-- `docs/strategies.md` - When to use what
-- `docs/advanced.md` - Advanced configuration
-- `docs/architecture.md` - How it works under the hood
+- `docs/guide.md` — Comprehensive usage guide
+- `docs/strategies.md` — Allocation strategy selection
+- `docs/advanced.md` — Advanced configuration options
+- `docs/architecture.md` — Internal design and implementation details
 
 ## Examples
 
-Real-world examples in `examples/`:
+Working examples are provided in the `examples/` directory:
 
-- `parser_expr.rs` - Expression parser with AST
-- `game_loop.rs` - Game loop with frame allocation
-- `graph_pool.rs` - Graph traversal with object pooling
-- `string_intern.rs` - String interning
-- `v0.5_features.rs` - All the new v0.5 features in action
+- `parser_expr.rs` — Expression parser with arena-allocated AST
+- `game_loop.rs` — Game loop with frame-based allocation
+- `graph_pool.rs` — Graph traversal with object pooling
+- `string_intern.rs` — String interning implementation
+- `v0.5_features.rs` — Demonstration of v0.5 features
 
 ## Contributing
 
-I'm pretty happy with where this is, but there's always room for improvement:
+Contributions are welcome. Please consider the following:
 
-- Bug reports and feature requests are welcome
-- Performance improvements are especially appreciated
-- Documentation fixes are always needed
-- If you're adding major features, let's talk first
+- Bug reports and feature requests via GitHub Issues
+- Performance improvements with benchmark data
+- Documentation corrections and improvements
+- For significant changes, please open an issue for discussion first
 
 ## License
 
-MIT or Apache-2.0, your choice. See the LICENSE files for details.
+Licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the full history. Recent highlights:
+See [CHANGELOG.md](CHANGELOG.md) for complete version history.
 
 ### v0.5.0
-- Added checkpoint/rewind API
-- Debug mode with memory safety checks
-- Virtual memory support for huge allocations
+- Checkpoint and rewind API for bulk deallocation
+- Debug mode with memory safety validation
+- Virtual memory support for large allocations
 - Thread-local caching and lock-free operations
-- Major performance improvements across the board
+- Significant performance improvements
 
 ### v0.4.x
 - Initial stable release
-- Basic arena and pool allocators
-- SyncArena for thread safety
-
----
-
-Built with ❤️ for the Rust community. If arena-b makes your code faster, I'd love to hear about it!
+- Core arena and pool allocator implementations
+- `SyncArena` for thread-safe allocation

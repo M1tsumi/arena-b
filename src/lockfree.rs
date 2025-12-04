@@ -1,13 +1,20 @@
 //! Lock-free optimizations for better concurrent performance
 
 use alloc::alloc::{alloc, dealloc, Layout};
-use core::ptr::NonNull;
-use core::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 use alloc::sync::Arc;
+use core::cmp;
+use core::ptr::{self, NonNull};
+use core::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
+use std::cell::RefCell;
+
+thread_local! {
+    static THREAD_SLAB: RefCell<ThreadSlab> = RefCell::new(ThreadSlab::new());
+}
 
 const LOCKFREE_BUFFER_SIZE: usize = 4096;
 const LOCKFREE_ALIGNMENT: usize = 64;
 const MAX_LOCKFREE_ALLOCATION: usize = 1024;
+const SLAB_MIN_BLOCK: usize = 256;
 
 // Lock-free buffer for small allocations
 pub struct LockFreeBuffer {
@@ -15,6 +22,7 @@ pub struct LockFreeBuffer {
     offset: AtomicUsize,
     capacity: usize,
     stats: Arc<LockFreeStats>,
+    generation: AtomicUsize,
 }
 
 impl LockFreeBuffer {
@@ -29,6 +37,7 @@ impl LockFreeBuffer {
             offset: AtomicUsize::new(0),
             capacity: LOCKFREE_BUFFER_SIZE,
             stats: Arc::new(LockFreeStats::new()),
+            generation: AtomicUsize::new(0),
         }
     }
 
@@ -37,45 +46,27 @@ impl LockFreeBuffer {
             return None;
         }
 
-        let current_offset = self.offset.load(Ordering::Acquire);
-        let aligned_offset = (current_offset + align - 1) & !(align - 1);
-        let new_offset = aligned_offset + size;
-
-        if new_offset > self.capacity {
-            self.stats.record_cache_miss();
-            self.stats.record_contention();
-            return None;
+        if let Some(ptr) = self.try_thread_slab(size, align) {
+            self.stats.record_allocation();
+            self.stats.record_cache_hit();
+            return Some(ptr);
         }
 
-        match self.offset.compare_exchange_weak(
-            current_offset,
-            new_offset,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ) {
-            Ok(_) => {
-                let buffer_ptr = self.buffer.load(Ordering::Acquire);
-                if buffer_ptr.is_null() {
-                    self.stats.record_cache_miss();
-                    return None;
-                }
-                
-                let ptr = unsafe { buffer_ptr.add(aligned_offset) };
-                self.stats.record_allocation();
-                self.stats.record_cache_hit();
-                Some(ptr)
-            }
-            Err(_) => {
-                self.stats.record_cache_miss();
-                self.stats.record_contention();
-                None
-            }
+        let result = self.refill_thread_slab_and_alloc(size, align);
+        if let Some(ptr) = result {
+            self.stats.record_allocation();
+            self.stats.record_cache_hit();
+            return Some(ptr);
         }
+
+        self.stats.record_cache_miss();
+        None
     }
 
     pub fn reset(&self) {
         // Reset offset to 0
         self.offset.store(0, Ordering::Release);
+        self.generation.fetch_add(1, Ordering::AcqRel);
         
         // Zero out the buffer for security
         let buffer_ptr = self.buffer.load(Ordering::Acquire);
@@ -87,6 +78,56 @@ impl LockFreeBuffer {
         
         // Reset stats
         self.stats.reset();
+    }
+
+    fn try_thread_slab(&self, size: usize, align: usize) -> Option<*mut u8> {
+        let owner = self as *const _;
+        let generation = self.generation.load(Ordering::Acquire);
+        THREAD_SLAB.with(|cell| {
+            let mut slab = cell.borrow_mut();
+            if !slab.matches(owner, generation) {
+                slab.invalidate();
+                return None;
+            }
+            slab.try_alloc(size, align)
+        })
+    }
+
+    fn refill_thread_slab_and_alloc(&self, size: usize, align: usize) -> Option<*mut u8> {
+        let buffer_ptr = self.buffer.load(Ordering::Acquire);
+        if buffer_ptr.is_null() {
+            return None;
+        }
+
+        let block_size = align_up(cmp::max(size, SLAB_MIN_BLOCK), LOCKFREE_ALIGNMENT);
+
+        loop {
+            let current = self.offset.load(Ordering::Acquire);
+            let start = align_up(current, LOCKFREE_ALIGNMENT);
+            let end = start + block_size;
+
+            if end > self.capacity {
+                return None;
+            }
+
+            match self
+                .offset
+                .compare_exchange(current, end, Ordering::AcqRel, Ordering::Acquire)
+            {
+                Ok(_) => {
+                    let generation = self.generation.load(Ordering::Acquire);
+                    return THREAD_SLAB.with(|cell| {
+                        let mut slab = cell.borrow_mut();
+                        slab.set_region(self as *const _, buffer_ptr, start, end, generation);
+                        slab.try_alloc(size, align)
+                    });
+                }
+                Err(_) => {
+                    self.stats.record_contention();
+                    continue;
+                }
+            }
+        }
     }
 
     pub fn stats(&self) -> &LockFreeStats {

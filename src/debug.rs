@@ -1,10 +1,10 @@
 //! Memory safety debugging with guards and use-after-rewind detection
 
 use alloc::collections::HashMap;
-use alloc::vec::Vec;
 use alloc::string::String;
-use core::sync::{Mutex, RwLock};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::sync::RwLock;
 
 const GUARD_MAGIC: u64 = 0xDEADBEEFCAFEBABE;
 const GUARD_SIZE: usize = 16;
@@ -65,16 +65,20 @@ struct AllocationInfo {
     ptr: *mut u8,
     size: usize,
     checkpoint_id: usize,
+    captured_backtrace: Option<String>,
 }
 
 // Global debug state
 static DEBUG_STATE: RwLock<DebugState> = RwLock::new(DebugState::new());
+static VALIDATION_ENABLED: AtomicBool = AtomicBool::new(false);
 
 struct DebugState {
     allocations: HashMap<usize, Vec<AllocationInfo>>,
     arena_checkpoints: HashMap<usize, usize>,
     next_arena_id: AtomicUsize,
     corrupted_allocations: usize,
+    leak_reports: usize,
+    backtraces_enabled: bool,
 }
 
 impl DebugState {
@@ -84,6 +88,8 @@ impl DebugState {
             arena_checkpoints: HashMap::new(),
             next_arena_id: AtomicUsize::new(1),
             corrupted_allocations: 0,
+            leak_reports: 0,
+            backtraces_enabled: cfg!(feature = "debug_backtrace"),
         }
     }
 
@@ -92,6 +98,7 @@ impl DebugState {
             ptr,
             size,
             checkpoint_id,
+            captured_backtrace: self.capture_backtrace(),
         };
         
         self.allocations
@@ -127,6 +134,63 @@ impl DebugState {
         }
         
         Err("Allocation not found")
+    }
+
+    fn validate_arena(&self, arena_id: usize) -> Result<(), String> {
+        if let Some(allocations) = self.allocations.get(&arena_id) {
+            let mut reports = Vec::new();
+            for info in allocations {
+                if let Err(err) = self.validate_allocation(arena_id, info.ptr) {
+                    let trace = info
+                        .captured_backtrace
+                        .as_deref()
+                        .unwrap_or("<backtrace unavailable>");
+                    reports.push(format!("Pointer {:p}: {}\n{}", info.ptr, err, trace));
+                }
+            }
+
+            if reports.is_empty() {
+                Ok(())
+            } else {
+                Err(reports.join("\n"))
+            }
+        } else {
+            Err("Arena not found".into())
+        }
+    }
+
+    fn capture_backtrace(&self) -> Option<String> {
+        if !self.backtraces_enabled {
+            return None;
+        }
+
+        #[cfg(feature = "debug_backtrace")]
+        {
+            Some(std::backtrace::Backtrace::capture().to_string())
+        }
+
+        #[cfg(not(feature = "debug_backtrace"))]
+        {
+            None
+        }
+    }
+
+    fn leak_report(&mut self, arena_id: usize) -> Vec<String> {
+        let mut reports = Vec::new();
+        if let Some(allocations) = self.allocations.get(&arena_id) {
+            for info in allocations {
+                let trace = info
+                    .captured_backtrace
+                    .as_deref()
+                    .unwrap_or("<backtrace unavailable>");
+                reports.push(format!(
+                    "Leaked allocation: ptr={:p}, size={}, checkpoint={}\n{}",
+                    info.ptr, info.size, info.checkpoint_id, trace
+                ));
+            }
+        }
+        self.leak_reports += reports.len();
+        reports
     }
 
     fn rewind_to_checkpoint(&mut self, arena_id: usize, checkpoint_id: usize) {
@@ -171,6 +235,10 @@ pub fn register_allocation(arena_id: usize, ptr: *mut u8, size: usize, checkpoin
 }
 
 pub fn validate_allocation(arena_id: usize, ptr: *mut u8) -> Result<(), &'static str> {
+    if !VALIDATION_ENABLED.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+
     if let Ok(state) = DEBUG_STATE.read() {
         state.validate_allocation(arena_id, ptr)
     } else {
@@ -188,6 +256,36 @@ pub fn rewind_to_checkpoint(checkpoint_id: usize) {
     }
 }
 
+pub fn rewind_arena_to_checkpoint(arena_id: usize, checkpoint_id: usize) {
+    if let Ok(mut state) = DEBUG_STATE.write() {
+        state.rewind_to_checkpoint(arena_id, checkpoint_id);
+    }
+}
+
+pub fn validate_arena(arena_id: usize) -> Result<(), String> {
+    if !VALIDATION_ENABLED.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+
+    if let Ok(state) = DEBUG_STATE.read() {
+        state.validate_arena(arena_id)
+    } else {
+        Err("Debug state locked".into())
+    }
+}
+
+pub fn enable_validation(enable: bool) {
+    VALIDATION_ENABLED.store(enable, Ordering::Relaxed);
+}
+
+pub fn leak_report(arena_id: usize) -> Vec<String> {
+    if let Ok(mut state) = DEBUG_STATE.write() {
+        state.leak_report(arena_id)
+    } else {
+        vec!["Debug state locked".into()]
+    }
+}
+
 pub fn get_debug_stats() -> crate::core::DebugStats {
     if let Ok(state) = DEBUG_STATE.read() {
         crate::core::DebugStats {
@@ -195,6 +293,7 @@ pub fn get_debug_stats() -> crate::core::DebugStats {
             active_checkpoints: state.arena_checkpoints.len(),
             current_checkpoint_id: state.arena_checkpoints.values().max().copied().unwrap_or(0),
             corrupted_allocations: state.corrupted_allocations,
+            leak_reports: state.leak_reports,
         }
     } else {
         crate::core::DebugStats::default()
@@ -315,6 +414,14 @@ impl DebugAllocator {
         }
 
         validate_allocation(self.arena_id, ptr)
+    }
+
+    pub fn validate_arena(&self) -> Result<(), String> {
+        validate_arena(self.arena_id)
+    }
+
+    pub fn leak_report(&self) -> Vec<String> {
+        leak_report(self.arena_id)
     }
 
     pub fn rewind(&self, checkpoint_id: usize) {
