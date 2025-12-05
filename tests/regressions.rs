@@ -22,7 +22,7 @@ fn lockfree_multithread_race_regression() {
             barrier.wait();
             for i in 0..ALLOCS_PER_THREAD {
                 let value = (tid * 10_000 + i) as u32;
-                let mut guard = arena.lock().unwrap();
+                let guard = arena.lock().unwrap();
                 let slot = guard.alloc(value);
                 assert_eq!(*slot, value);
             }
@@ -33,7 +33,7 @@ fn lockfree_multithread_race_regression() {
         handle.join().expect("lock-free worker thread panicked");
     }
 
-    let expected = (THREADS * ALLOCS_PER_THREAD) as usize;
+    let expected = THREADS * ALLOCS_PER_THREAD;
     let stats = arena.lock().unwrap().lockfree_stats();
     assert!(
         stats.0 >= expected,
