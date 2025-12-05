@@ -172,6 +172,40 @@ mod virtual_memory {
         }
     }
 
+    /// Releases all chunks beyond the first, reducing memory footprint after spikes.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure no allocations from trimmed chunks are still in use.
+    pub unsafe fn shrink_to_fit(&mut self) {
+        let inner = &mut *self.inner.get();
+        if inner.chunks.len() <= 1 {
+            return;
+        }
+
+        while inner.chunks.len() > 1 {
+            inner.chunks.pop();
+        }
+        inner.current_chunk.store(0, Ordering::Release);
+        inner.checkpoints.clear();
+
+        #[cfg(feature = "stats")]
+        {
+            self.stats.bytes_used.store(0, Ordering::Release);
+            self.stats.allocation_count.store(0, Ordering::Release);
+        }
+    }
+
+    /// Combination helper that performs [`reset`](Self::reset) followed by [`shrink_to_fit`](Self::shrink_to_fit).
+    ///
+    /// # Safety
+    ///
+    /// Carries the same requirements as both `reset` and `shrink_to_fit`.
+    pub unsafe fn reset_and_shrink(&mut self) {
+        self.reset();
+        self.shrink_to_fit();
+    }
+
     impl Drop for VirtualMemoryRegion {
         fn drop(&mut self) {
             unsafe {
@@ -1736,6 +1770,7 @@ impl Arena {
     /// Callers can mutate the returned string via [`str::as_bytes_mut`] to
     /// write valid UTF-8 data without any extra allocations or copies.
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc_str_uninit(&self, len: usize) -> &mut str {
         let buffer = self.alloc_slice_uninit::<u8>(len);
         for slot in buffer.iter_mut() {
@@ -1746,6 +1781,52 @@ impl Arena {
             let ptr = buffer.as_mut_ptr() as *mut u8;
             let bytes = std::slice::from_raw_parts_mut(ptr, buffer.len());
             std::str::from_utf8_unchecked_mut(bytes)
+        }
+    }
+
+    /// Proactively reserves at least `additional` bytes of contiguous space in the current arena.
+    ///
+    /// This method can be used before predictable allocation spikes to avoid repeated
+    /// chunk growth pauses in hot paths. If the current chunk already has enough space,
+    /// the call is a no-op. Otherwise, a new chunk large enough to satisfy the request
+    /// is appended eagerly.
+    pub fn reserve_additional(&mut self, additional: usize) {
+        if additional == 0 {
+            return;
+        }
+
+        unsafe {
+            let inner = &mut *self.inner.get();
+            if inner.chunks.is_empty() {
+                return;
+            }
+
+            let current_idx = inner.current_chunk.load(Ordering::Acquire);
+            let (capacity, used) = {
+                let chunk = &inner.chunks[current_idx];
+                (chunk.capacity, chunk.used.load(Ordering::Acquire))
+            };
+
+            let available = capacity.saturating_sub(used);
+            if available >= additional {
+                return;
+            }
+
+            let needed = additional - available;
+            let new_capacity =
+                next_chunk_capacity_optimized(capacity, needed, CHUNK_ALIGN);
+            let new_chunk = allocate_chunk(new_capacity);
+            inner.chunks.push(new_chunk);
+            inner
+                .current_chunk
+                .store(inner.chunks.len() - 1, Ordering::Release);
+
+            #[cfg(feature = "stats")]
+            {
+                self.stats
+                    .bytes_used
+                    .fetch_add(0, Ordering::Relaxed); // touch to keep cache line warm
+            }
         }
     }
 

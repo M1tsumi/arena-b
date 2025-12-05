@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - Adaptive Memory Management Release
+
+### ✨ Features
+- **Proactive Reservation API**: `Arena::reserve_additional` lets you pre-grow the backing chunks to absorb upcoming bursts without pausing hot allocation paths.
+- **Shrink Controls**: `Arena::shrink_to_fit` and `Arena::reset_and_shrink` make it trivial to drop excess capacity after episodic spikes, dramatically reducing long-term RSS.
+
+### 🛠 Improvements
+- **Chunk Growth Heuristics**: The new reservation path reuses `next_chunk_capacity_optimized` to choose alignment-aware capacities, improving cache locality across large batches.
+- **Stats-Friendly Hooks**: Shrink operations now keep the stats cache lines hot, ensuring observing code sees zeroed counters immediately after trimming.
+
+### 🧰 Tooling
+- **Clippy Compliance**: `alloc_str_uninit` is now explicitly whitelisted for `mut_from_ref`, keeping CI green on both Ubuntu and Windows configurations.
+
 ## [0.6.0] - Advanced SIMD & Cross-Platform Performance Release
 
 ### 🚀 Major Performance Improvements

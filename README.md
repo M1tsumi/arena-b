@@ -36,8 +36,15 @@ fn main() {
 - **Memory Safety**: Unsafe internals are carefully encapsulated and thoroughly tested
 - **Checkpoint API**: Save and restore allocation state for frame-based or request-scoped patterns
 - **Zero-Cost Abstractions**: Optional features incur no overhead when disabled
+- **Adaptive Capacity Controls** *(v0.7)*: `reserve_additional`, `shrink_to_fit`, and `reset_and_shrink` let you grow ahead of allocation spikes and release memory afterward.
 - **Advanced Debugging** *(v0.6)*: Leak detection, validation hooks, and optional backtraces make it easier to audit arena usage during development
 - **Virtual Memory Instrumentation** *(v0.6)*: Inspect committed bytes at runtime and rely on improved macOS/Windows handling for large reserves
+
+## What's New in v0.7
+
+- **Proactive Reservation**: Call `Arena::reserve_additional(bytes)` to pre-grow the underlying chunk before a known burst of allocations, reducing contention in hot paths.
+- **Memory Trimming**: `Arena::shrink_to_fit` and `Arena::reset_and_shrink` reclaim any extra chunks after a spike, keeping long-running services lean.
+- **Docs & Tooling**: README and changelog now cover the adaptive APIs, and CI stays green with the explicit Clippy allowance on `alloc_str_uninit`.
 
 ## What's New in v0.6
 
