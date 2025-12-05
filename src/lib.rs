@@ -172,40 +172,6 @@ mod virtual_memory {
         }
     }
 
-    /// Releases all chunks beyond the first, reducing memory footprint after spikes.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure no allocations from trimmed chunks are still in use.
-    pub unsafe fn shrink_to_fit(&mut self) {
-        let inner = &mut *self.inner.get();
-        if inner.chunks.len() <= 1 {
-            return;
-        }
-
-        while inner.chunks.len() > 1 {
-            inner.chunks.pop();
-        }
-        inner.current_chunk.store(0, Ordering::Release);
-        inner.checkpoints.clear();
-
-        #[cfg(feature = "stats")]
-        {
-            self.stats.bytes_used.store(0, Ordering::Release);
-            self.stats.allocation_count.store(0, Ordering::Release);
-        }
-    }
-
-    /// Combination helper that performs [`reset`](Self::reset) followed by [`shrink_to_fit`](Self::shrink_to_fit).
-    ///
-    /// # Safety
-    ///
-    /// Carries the same requirements as both `reset` and `shrink_to_fit`.
-    pub unsafe fn reset_and_shrink(&mut self) {
-        self.reset();
-        self.shrink_to_fit();
-    }
-
     impl Drop for VirtualMemoryRegion {
         fn drop(&mut self) {
             unsafe {
@@ -1813,8 +1779,7 @@ impl Arena {
             }
 
             let needed = additional - available;
-            let new_capacity =
-                next_chunk_capacity_optimized(capacity, needed, CHUNK_ALIGN);
+            let new_capacity = next_chunk_capacity_optimized(capacity, needed, CHUNK_ALIGN);
             let new_chunk = allocate_chunk(new_capacity);
             inner.chunks.push(new_chunk);
             inner
@@ -1823,11 +1788,41 @@ impl Arena {
 
             #[cfg(feature = "stats")]
             {
-                self.stats
-                    .bytes_used
-                    .fetch_add(0, Ordering::Relaxed); // touch to keep cache line warm
+                self.stats.bytes_used.fetch_add(0, Ordering::Relaxed); // touch to keep cache line warm
             }
         }
+    }
+
+    /// Releases all chunks beyond the first, reducing memory footprint after spikes.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure no allocations from trimmed chunks are still in use.
+    pub unsafe fn shrink_to_fit(&mut self) {
+        let inner = &mut *self.inner.get();
+        if inner.chunks.len() <= 1 {
+            return;
+        }
+
+        inner.chunks.truncate(1);
+        inner.current_chunk.store(0, Ordering::Release);
+        inner.checkpoints.clear();
+
+        #[cfg(feature = "stats")]
+        {
+            self.stats.bytes_used.store(0, Ordering::Release);
+            self.stats.allocation_count.store(0, Ordering::Release);
+        }
+    }
+
+    /// Combination helper that performs [`reset`](Self::reset) followed by [`shrink_to_fit`](Self::shrink_to_fit).
+    ///
+    /// # Safety
+    ///
+    /// Carries the same requirements as both `reset` and `shrink_to_fit`.
+    pub unsafe fn reset_and_shrink(&mut self) {
+        self.reset();
+        self.shrink_to_fit();
     }
 
     pub fn scope<'arena, F, R>(&'arena self, f: F) -> R
