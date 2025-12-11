@@ -36,9 +36,18 @@ fn main() {
 - **Memory Safety**: Unsafe internals are carefully encapsulated and thoroughly tested
 - **Checkpoint API**: Save and restore allocation state for frame-based or request-scoped patterns
 - **Zero-Cost Abstractions**: Optional features incur no overhead when disabled
-- **Adaptive Capacity Controls** *(v0.7)*: `reserve_additional`, `shrink_to_fit`, and `reset_and_shrink` let you grow ahead of allocation spikes and release memory afterward.
+- **Adaptive Capacity Controls** *(v0.7)*: `reserve_additional`, `shrink_to_fit`, and `reset_and_shrink` let you grow ahead of allocation spikes and release memory afterward
+- **Lock-Free Object Pool** *(v0.8)*: Generic `LockFreePool<T>` for zero-contention object reuse in high-frequency allocation patterns
 - **Advanced Debugging** *(v0.6)*: Leak detection, validation hooks, and optional backtraces make it easier to audit arena usage during development
 - **Virtual Memory Instrumentation** *(v0.6)*: Inspect committed bytes at runtime and rely on improved macOS/Windows handling for large reserves
+
+## What's New in v0.8
+
+- **Generic Lock-Free Pool**: `LockFreePool<T>` provides thread-safe object pooling with atomic CAS operations for game engines, parsers, and high-frequency allocation patterns
+- **Lock-Free Allocator Control**: `LockFreeAllocator` with runtime `enable()`/`disable()` switching and `cache_hit_rate()` monitoring
+- **Thread-Local Slabs**: `ThreadSlab` with generation-based invalidation for per-thread fast-path allocations
+- **Enhanced Statistics**: `LockFreeStats` now supports `cache_hit_rate()`, `record_deallocation()`, and is `Clone`able for snapshots
+- **Debug Improvements**: `DebugStats` includes `leak_reports` counter for tracking leak detection calls
 
 ## What's New in v0.7
 
@@ -68,7 +77,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-arena-b = "0.5"
+arena-b = "0.8"
 ```
 
 Or via the command line:
@@ -83,13 +92,13 @@ Enable features based on your requirements:
 
 ```toml
 # Basic bump allocator
-arena-b = "0.5"
+arena-b = "0.8"
 
 # With debug safety checks (recommended for development)
-arena-b = { version = "0.5", features = ["debug"] }
+arena-b = { version = "0.8", features = ["debug"] }
 
 # Full feature set for maximum performance
-arena-b = { version = "0.5", features = ["debug", "virtual_memory", "thread_local", "lockfree"] }
+arena-b = { version = "0.8", features = ["debug", "virtual_memory", "thread_local", "lockfree"] }
 ```
 
 | Feature | Description |
@@ -280,14 +289,25 @@ Licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 See [CHANGELOG.md](CHANGELOG.md) for complete version history.
 
+### v0.8.0
+- Generic `LockFreePool<T>` for thread-safe object pooling
+- `LockFreeAllocator` with runtime enable/disable control
+- `ThreadSlab` for per-thread fast-path allocations
+- Enhanced `LockFreeStats` with `cache_hit_rate()` and `Clone`
+- `DebugStats` now includes `leak_reports` field
+
+### v0.7.0
+- `reserve_additional` for proactive capacity growth
+- `shrink_to_fit` and `reset_and_shrink` for memory trimming
+
+### v0.6.0
+- AVX2/NEON SIMD optimizations
+- `alloc_slice_fast` and `alloc_str_uninit` APIs
+- Virtual memory telemetry and cross-platform fixes
+- Panic-safe scopes
+
 ### v0.5.0
 - Checkpoint and rewind API for bulk deallocation
 - Debug mode with memory safety validation
 - Virtual memory support for large allocations
 - Thread-local caching and lock-free operations
-- Significant performance improvements
-
-### v0.4.x
-- Initial stable release
-- Core arena and pool allocator implementations
-- `SyncArena` for thread-safe allocation

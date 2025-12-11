@@ -165,12 +165,14 @@ pub struct ArenaCheckpoint {
 }
 
 // Debug statistics
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct DebugStats {
     pub total_allocations: usize,
     pub active_checkpoints: usize,
     pub current_checkpoint_id: usize,
     pub corrupted_allocations: usize,
+    /// Number of leak reports generated
+    pub leak_reports: usize,
 }
 
 // Arena statistics
