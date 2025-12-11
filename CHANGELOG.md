@@ -4,6 +4,107 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] - v0.8.0 - Enhanced Lock-Free Architecture & Pool Allocator Release
+
+### ✨ New Features
+
+- **Generic Lock-Free Object Pool (`LockFreePool<T>`)**: A new thread-safe, lock-free pool allocator for reusable objects
+  - Generic over any type `T` for flexible object pooling
+  - Atomic compare-and-swap operations for contention-free allocation/deallocation
+  - Built-in statistics tracking (allocations, cache hits/misses, contention events)
+  - Automatic memory cleanup on drop with proper node deallocation
+  - Ideal for game engines, parsers, and high-frequency allocation patterns
+
+- **Lock-Free Allocator Wrapper (`LockFreeAllocator`)**: High-level allocator with runtime enable/disable control
+  - `enable()`/`disable()` methods for dynamic allocation strategy switching
+  - `is_enabled()` for querying current state
+  - `cache_hit_rate()` for performance monitoring
+  - Seamless integration with existing arena allocation paths
+
+- **Thread-Local Slab Allocator**: Per-thread allocation slabs for reduced contention
+  - `ThreadSlab` with generation-based invalidation for safe reuse
+  - Automatic slab refilling from the lock-free buffer
+  - Configurable slab block size (256 bytes minimum)
+  - Zero-copy allocation within thread-local regions
+
+- **Enhanced Statistics API**
+  - `cache_hit_rate()` method on `LockFreeStats` for performance analysis
+  - `record_deallocation()` for accurate allocation tracking
+  - Cloneable `LockFreeStats` for snapshot-based monitoring
+
+### 🛠 Improvements
+
+- **Optimized `shrink_to_fit` Implementation**: Changed from `truncate(1)` to iterative `pop()` for more predictable memory release behavior and better compatibility with custom allocators
+
+- **Virtual Memory Region Enhancements**
+  - Added `MAX_RESERVE_SIZE` constant (4GB) for safe default clamping
+  - Improved `decommit()` with proper `MADV_FREE`/`MADV_DONTNEED` handling on Unix
+  - Better macOS support with `pthread_jit_write_protect_np` handling
+  - Enhanced error messages for Windows `VirtualAlloc` failures
+
+- **Debug Module Refinements**
+  - Leak reporting with `leak_reports` counter in `DebugStats`
+  - `cleanup_arena()` for explicit arena cleanup in debug mode
+  - Improved `validate_arena()` with detailed error reporting including backtraces
+
+- **Thread-Local Cache Improvements**
+  - `cleanup_thread_cache(arena_id)` for arena-specific cache cleanup
+  - Better arena ID tracking to prevent cross-arena cache pollution
+  - Partial cache clearing (`clear_partial()`) to avoid full cache flushes
+
+### 🔧 API Additions
+
+```rust
+// New Lock-Free Pool API
+let pool: LockFreePool<MyObject> = LockFreePool::new();
+if let Some(obj) = pool.try_alloc() {
+    // Use object...
+}
+pool.dealloc(obj); // Return to pool for reuse
+
+// Lock-Free Allocator Control
+let mut allocator = LockFreeAllocator::new();
+allocator.disable(); // Switch to standard allocation
+allocator.enable();  // Re-enable lock-free path
+let hit_rate = allocator.cache_hit_rate();
+
+// Enhanced Statistics
+let stats = buffer.stats();
+println!("Cache hit rate: {:.2}%", stats.cache_hit_rate() * 100.0);
+```
+
+### 🏗️ Code Refactoring
+
+- **Modular Lock-Free Implementation**: Separated `LockFreeBuffer`, `LockFreeStats`, `LockFreeAllocator`, and `LockFreePool` into distinct, composable components
+- **Improved Memory Alignment**: Consistent 64-byte cache line alignment across all lock-free structures
+- **Generation-Based Invalidation**: Thread slabs now use generation counters to safely detect stale allocations after arena resets
+
+### 📊 Performance Characteristics
+
+| Component | Benefit | Use Case |
+|-----------|---------|----------|
+| `LockFreePool<T>` | Zero-contention object reuse | Frequent alloc/dealloc cycles |
+| `ThreadSlab` | Per-thread fast path | Multi-threaded workloads |
+| `LockFreeAllocator` | Runtime strategy switching | Adaptive allocation |
+| `cache_hit_rate()` | Performance visibility | Tuning and monitoring |
+
+### 🐛 Bug Fixes
+
+- Fixed potential memory leak in `LockFreePoolInner` drop implementation
+- Corrected generation tracking in thread slab invalidation
+- Improved atomic ordering consistency in lock-free operations
+
+### 📦 Dependencies
+
+- No new dependencies added
+- Maintained compatibility with `cfg-if` 1.0, `windows-sys` 0.59, `libc` 0.2
+
+### 🔄 Breaking Changes
+
+- None - fully backward compatible with v0.7.0
+
+---
+
 ## [0.7.0] - Adaptive Memory Management Release
 
 ### ✨ Features

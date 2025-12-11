@@ -474,10 +474,333 @@ mod lockfree {
                 self.contention_count.load(Ordering::Relaxed),
             )
         }
+
+        pub fn record_deallocation(&self) {
+            self.allocations.fetch_sub(1, Ordering::Relaxed);
+        }
+
+        pub fn cache_hit_rate(&self) -> f64 {
+            let hits = self.cache_hits.load(Ordering::Relaxed);
+            let total = hits + self.cache_misses.load(Ordering::Relaxed);
+            if total == 0 {
+                0.0
+            } else {
+                hits as f64 / total as f64
+            }
+        }
+    }
+
+    impl Clone for LockFreeStats {
+        fn clone(&self) -> Self {
+            Self {
+                allocations: AtomicUsize::new(self.allocations.load(Ordering::Relaxed)),
+                cache_hits: AtomicUsize::new(self.cache_hits.load(Ordering::Relaxed)),
+                cache_misses: AtomicUsize::new(self.cache_misses.load(Ordering::Relaxed)),
+                contention_count: AtomicUsize::new(self.contention_count.load(Ordering::Relaxed)),
+            }
+        }
+    }
+
+    impl Default for LockFreeStats {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     unsafe impl Send for LockFreeStats {}
     unsafe impl Sync for LockFreeStats {}
+
+    // v0.8.0: Thread-local slab allocator for reduced contention
+    /// Thread-local slab allocator for reduced contention.
+    /// 
+    /// Each thread gets its own slab region carved from the lock-free buffer,
+    /// enabling zero-contention allocations within that region.
+    #[repr(C)]
+    pub struct ThreadSlab {
+        /// Pointer to the owning LockFreeBuffer (for validation)
+        owner: *const LockFreeBuffer,
+        /// Base pointer of the slab region
+        base: *mut u8,
+        /// Start offset within the buffer
+        start: usize,
+        /// End offset within the buffer (exclusive)
+        end: usize,
+        /// Current allocation offset within the slab
+        offset: usize,
+        /// Generation counter to detect stale slabs after reset
+        generation: usize,
+    }
+
+    impl ThreadSlab {
+        /// Create a new empty thread slab.
+        pub fn new() -> Self {
+            Self {
+                owner: std::ptr::null(),
+                base: std::ptr::null_mut(),
+                start: 0,
+                end: 0,
+                offset: 0,
+                generation: 0,
+            }
+        }
+
+        /// Check if this slab belongs to the given buffer and generation.
+        #[inline]
+        pub fn matches(&self, owner: *const LockFreeBuffer, generation: usize) -> bool {
+            self.owner == owner && self.generation == generation && !self.base.is_null()
+        }
+
+        /// Set the slab region from the lock-free buffer.
+        pub fn set_region(
+            &mut self,
+            owner: *const LockFreeBuffer,
+            base: *mut u8,
+            start: usize,
+            end: usize,
+            generation: usize,
+        ) {
+            self.owner = owner;
+            self.base = base;
+            self.start = start;
+            self.end = end;
+            self.offset = start;
+            self.generation = generation;
+        }
+
+        /// Try to allocate from the thread-local slab.
+        #[inline]
+        pub fn try_alloc(&mut self, size: usize, align: usize) -> Option<*mut u8> {
+            if self.base.is_null() {
+                return None;
+            }
+
+            let aligned_offset = (self.offset + align - 1) & !(align - 1);
+            let new_offset = aligned_offset + size;
+
+            if new_offset <= self.end {
+                self.offset = new_offset;
+                Some(unsafe { self.base.add(aligned_offset) })
+            } else {
+                None
+            }
+        }
+
+        /// Invalidate this slab (called when generation changes).
+        pub fn invalidate(&mut self) {
+            self.owner = std::ptr::null();
+            self.base = std::ptr::null_mut();
+            self.start = 0;
+            self.end = 0;
+            self.offset = 0;
+            self.generation = 0;
+        }
+
+        /// Get remaining capacity in this slab.
+        #[inline]
+        pub fn remaining(&self) -> usize {
+            if self.base.is_null() {
+                0
+            } else {
+                self.end.saturating_sub(self.offset)
+            }
+        }
+    }
+
+    impl Default for ThreadSlab {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    unsafe impl Send for ThreadSlab {}
+
+    // v0.8.0: Lock-free allocator wrapper with runtime enable/disable
+    /// High-level lock-free allocator with runtime enable/disable control.
+    pub struct LockFreeAllocator {
+        buffer: Option<LockFreeBuffer>,
+        stats: LockFreeStats,
+        enabled: bool,
+    }
+
+    impl LockFreeAllocator {
+        pub fn new() -> Self {
+            Self {
+                buffer: Some(LockFreeBuffer::new(4096)),
+                stats: LockFreeStats::new(),
+                enabled: true,
+            }
+        }
+
+        pub fn enable(&mut self) {
+            self.enabled = true;
+        }
+
+        pub fn disable(&mut self) {
+            self.enabled = false;
+        }
+
+        pub fn is_enabled(&self) -> bool {
+            self.enabled
+        }
+
+        pub fn try_alloc(&self, size: usize, align: usize) -> Option<*mut u8> {
+            if !self.enabled || size > 1024 {
+                return None;
+            }
+
+            if let Some(ref buffer) = self.buffer {
+                buffer.try_alloc(size, align)
+            } else {
+                None
+            }
+        }
+
+        pub fn reset(&mut self) {
+            if let Some(ref buffer) = self.buffer {
+                buffer.reset();
+            }
+        }
+
+        pub fn stats(&self) -> (usize, usize, usize, usize) {
+            self.stats.get_stats()
+        }
+
+        pub fn cache_hit_rate(&self) -> f64 {
+            self.stats.cache_hit_rate()
+        }
+    }
+
+    impl Default for LockFreeAllocator {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    // v0.8.0: Generic lock-free object pool
+    /// A thread-safe, lock-free pool allocator for reusable objects.
+    pub struct LockFreePool<T> {
+        head: AtomicPtr<LockFreeNode<T>>,
+        stats: LockFreeStats,
+    }
+
+    struct LockFreeNode<T> {
+        data: T,
+        next: AtomicPtr<LockFreeNode<T>>,
+    }
+
+    impl<T> LockFreePool<T> {
+        pub fn new() -> Self {
+            Self {
+                head: AtomicPtr::new(std::ptr::null_mut()),
+                stats: LockFreeStats::new(),
+            }
+        }
+
+        /// Try to get an object from the pool.
+        pub fn try_alloc(&self) -> Option<T> {
+            loop {
+                let head = self.head.load(Ordering::Acquire);
+                if head.is_null() {
+                    self.stats.record_cache_miss();
+                    return None;
+                }
+
+                let node = unsafe { &*head };
+                let next = node.next.load(Ordering::Acquire);
+
+                match self.head.compare_exchange_weak(
+                    head,
+                    next,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(_) => {
+                        self.stats.record_allocation();
+                        self.stats.record_cache_hit();
+                        
+                        let data = unsafe { std::ptr::read(&node.data) };
+                        unsafe {
+                            let layout = std::alloc::Layout::new::<LockFreeNode<T>>();
+                            std::alloc::dealloc(head as *mut u8, layout);
+                        }
+                        return Some(data);
+                    }
+                    Err(_) => {
+                        self.stats.record_contention();
+                        continue;
+                    }
+                }
+            }
+        }
+
+        /// Return an object to the pool for reuse.
+        pub fn dealloc(&self, data: T) {
+            let layout = std::alloc::Layout::new::<LockFreeNode<T>>();
+            let node_ptr = unsafe { std::alloc::alloc(layout) as *mut LockFreeNode<T> };
+            if node_ptr.is_null() {
+                return;
+            }
+
+            unsafe {
+                std::ptr::write(&mut (*node_ptr).data, data);
+                (*node_ptr).next = AtomicPtr::new(std::ptr::null_mut());
+            }
+
+            loop {
+                let head = self.head.load(Ordering::Acquire);
+                unsafe {
+                    (*node_ptr).next.store(head, Ordering::Relaxed);
+                }
+
+                match self.head.compare_exchange_weak(
+                    head,
+                    node_ptr,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(_) => {
+                        self.stats.record_deallocation();
+                        return;
+                    }
+                    Err(_) => {
+                        self.stats.record_contention();
+                        continue;
+                    }
+                }
+            }
+        }
+
+        pub fn stats(&self) -> (usize, usize, usize, usize) {
+            self.stats.get_stats()
+        }
+    }
+
+    impl<T> Default for LockFreePool<T> {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl<T> Drop for LockFreePool<T> {
+        fn drop(&mut self) {
+            let mut head = self.head.load(Ordering::Acquire);
+            while !head.is_null() {
+                let node = unsafe { &*head };
+                let next = node.next.load(Ordering::Acquire);
+                
+                unsafe {
+                    std::ptr::drop_in_place(&mut (*head).data);
+                    let layout = std::alloc::Layout::new::<LockFreeNode<T>>();
+                    std::alloc::dealloc(head as *mut u8, layout);
+                }
+                
+                head = next;
+            }
+        }
+    }
+
+    unsafe impl<T: Send> Send for LockFreePool<T> {}
+    unsafe impl<T: Send> Sync for LockFreePool<T> {}
 }
 
 #[cfg(feature = "debug")]
@@ -516,6 +839,12 @@ mod debug {
 
     unsafe impl Send for DebugState {}
     unsafe impl Sync for DebugState {}
+
+    impl Default for DebugState {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 
     impl DebugState {
         pub fn new() -> Self {
@@ -819,6 +1148,8 @@ pub struct DebugStats {
     pub current_checkpoint_id: u64,
     /// Number of corrupted allocations detected
     pub corrupted_allocations: usize,
+    /// Number of leak reports generated
+    pub leak_reports: usize,
 }
 
 pub struct Arena {
@@ -2301,6 +2632,7 @@ impl Arena {
             active_checkpoints: inner.checkpoints.len(),
             current_checkpoint_id: debug_state.get_current_checkpoint_id(arena_id),
             corrupted_allocations,
+            leak_reports: 0, // Will be populated by leak_report() calls
         }
     }
 }
@@ -2579,3 +2911,23 @@ impl ArenaBuilder {
         Arena::with_capacity(capacity)
     }
 }
+
+// ============================================================================
+// v0.8.0: Public API Exports
+// ============================================================================
+
+/// Re-export lock-free types when the feature is enabled.
+#[cfg(feature = "lockfree")]
+pub use lockfree::{LockFreeAllocator, LockFreeBuffer, LockFreePool, LockFreeStats, ThreadSlab};
+
+/// Re-export thread-local cache types when the feature is enabled.
+#[cfg(feature = "thread_local")]
+pub use thread_local_cache::{clear_thread_cache, reset_thread_cache, try_thread_local_alloc};
+
+/// Re-export virtual memory types when the feature is enabled.
+#[cfg(feature = "virtual_memory")]
+pub use virtual_memory::VirtualMemoryRegion;
+
+/// Re-export debug types when the feature is enabled.
+#[cfg(feature = "debug")]
+pub use debug::{AllocationInfo, DEBUG_STATE, FREED_MAGIC, GUARD_MAGIC};

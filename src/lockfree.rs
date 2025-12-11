@@ -12,6 +12,123 @@ thread_local! {
 }
 
 const LOCKFREE_BUFFER_SIZE: usize = 4096;
+
+/// Align a value up to the given alignment.
+#[inline]
+fn align_up(value: usize, align: usize) -> usize {
+    (value + align - 1) & !(align - 1)
+}
+
+/// Thread-local slab allocator for reduced contention.
+/// 
+/// Each thread gets its own slab region carved from the lock-free buffer,
+/// enabling zero-contention allocations within that region.
+#[repr(C)]
+pub struct ThreadSlab {
+    /// Pointer to the owning LockFreeBuffer (for validation)
+    owner: *const LockFreeBuffer,
+    /// Base pointer of the slab region
+    base: *mut u8,
+    /// Start offset within the buffer
+    start: usize,
+    /// End offset within the buffer (exclusive)
+    end: usize,
+    /// Current allocation offset within the slab
+    offset: usize,
+    /// Generation counter to detect stale slabs after reset
+    generation: usize,
+}
+
+impl ThreadSlab {
+    /// Create a new empty thread slab.
+    pub fn new() -> Self {
+        Self {
+            owner: core::ptr::null(),
+            base: core::ptr::null_mut(),
+            start: 0,
+            end: 0,
+            offset: 0,
+            generation: 0,
+        }
+    }
+
+    /// Check if this slab belongs to the given buffer and generation.
+    #[inline]
+    pub fn matches(&self, owner: *const LockFreeBuffer, generation: usize) -> bool {
+        self.owner == owner && self.generation == generation && !self.base.is_null()
+    }
+
+    /// Set the slab region from the lock-free buffer.
+    pub fn set_region(
+        &mut self,
+        owner: *const LockFreeBuffer,
+        base: *mut u8,
+        start: usize,
+        end: usize,
+        generation: usize,
+    ) {
+        self.owner = owner;
+        self.base = base;
+        self.start = start;
+        self.end = end;
+        self.offset = start;
+        self.generation = generation;
+    }
+
+    /// Try to allocate from the thread-local slab.
+    #[inline]
+    pub fn try_alloc(&mut self, size: usize, align: usize) -> Option<*mut u8> {
+        if self.base.is_null() {
+            return None;
+        }
+
+        let aligned_offset = align_up(self.offset, align);
+        let new_offset = aligned_offset + size;
+
+        if new_offset <= self.end {
+            self.offset = new_offset;
+            Some(unsafe { self.base.add(aligned_offset) })
+        } else {
+            None
+        }
+    }
+
+    /// Invalidate this slab (called when generation changes).
+    pub fn invalidate(&mut self) {
+        self.owner = core::ptr::null();
+        self.base = core::ptr::null_mut();
+        self.start = 0;
+        self.end = 0;
+        self.offset = 0;
+        self.generation = 0;
+    }
+
+    /// Get remaining capacity in this slab.
+    #[inline]
+    pub fn remaining(&self) -> usize {
+        if self.base.is_null() {
+            0
+        } else {
+            self.end.saturating_sub(self.offset)
+        }
+    }
+
+    /// Check if this slab is valid and has capacity.
+    #[inline]
+    pub fn is_valid(&self) -> bool {
+        !self.base.is_null() && self.offset < self.end
+    }
+}
+
+impl Default for ThreadSlab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// Safety: ThreadSlab is only accessed from its owning thread via thread_local!
+unsafe impl Send for ThreadSlab {}
+
 const LOCKFREE_ALIGNMENT: usize = 64;
 const MAX_LOCKFREE_ALLOCATION: usize = 1024;
 const SLAB_MIN_BLOCK: usize = 256;
@@ -151,6 +268,12 @@ impl Drop for LockFreeBuffer {
     }
 }
 
+impl Default for LockFreeBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Lock-free statistics tracking
 #[derive(Debug)]
 pub struct LockFreeStats {
@@ -225,6 +348,12 @@ impl Clone for LockFreeStats {
             cache_misses: AtomicUsize::new(self.cache_misses.load(Ordering::Relaxed)),
             contention_events: AtomicUsize::new(self.contention_events.load(Ordering::Relaxed)),
         }
+    }
+}
+
+impl Default for LockFreeStats {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
