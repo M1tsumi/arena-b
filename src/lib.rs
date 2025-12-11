@@ -512,7 +512,7 @@ mod lockfree {
 
     // v0.8.0: Thread-local slab allocator for reduced contention
     /// Thread-local slab allocator for reduced contention.
-    /// 
+    ///
     /// Each thread gets its own slab region carved from the lock-free buffer,
     /// enabling zero-contention allocations within that region.
     #[repr(C)]
@@ -717,7 +717,7 @@ mod lockfree {
                     Ok(_) => {
                         self.stats.record_allocation();
                         self.stats.record_cache_hit();
-                        
+
                         let data = unsafe { std::ptr::read(&node.data) };
                         unsafe {
                             let layout = std::alloc::Layout::new::<LockFreeNode<T>>();
@@ -787,13 +787,13 @@ mod lockfree {
             while !head.is_null() {
                 let node = unsafe { &*head };
                 let next = node.next.load(Ordering::Acquire);
-                
+
                 unsafe {
                     std::ptr::drop_in_place(&mut (*head).data);
                     let layout = std::alloc::Layout::new::<LockFreeNode<T>>();
                     std::alloc::dealloc(head as *mut u8, layout);
                 }
-                
+
                 head = next;
             }
         }

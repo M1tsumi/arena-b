@@ -2,25 +2,25 @@
 
 #[cfg(feature = "lockfree")]
 mod lockfree_pool_tests {
-    use arena_b::{LockFreePool, LockFreeAllocator, LockFreeStats, ThreadSlab};
+    use arena_b::{LockFreeAllocator, LockFreePool, LockFreeStats, ThreadSlab};
 
     #[test]
     fn test_lockfree_pool_basic() {
         let pool: LockFreePool<u32> = LockFreePool::new();
-        
+
         // Pool starts empty
         assert!(pool.try_alloc().is_none());
-        
+
         // Add items to pool
         pool.dealloc(42);
         pool.dealloc(100);
         pool.dealloc(200);
-        
+
         // Retrieve items (LIFO order)
         assert_eq!(pool.try_alloc(), Some(200));
         assert_eq!(pool.try_alloc(), Some(100));
         assert_eq!(pool.try_alloc(), Some(42));
-        
+
         // Pool is empty again
         assert!(pool.try_alloc().is_none());
     }
@@ -28,17 +28,17 @@ mod lockfree_pool_tests {
     #[test]
     fn test_lockfree_pool_stats() {
         let pool: LockFreePool<i32> = LockFreePool::new();
-        
+
         // Initial stats
-        let (allocs, hits, misses, contention) = pool.stats();
+        let (allocs, hits, _misses, _contention) = pool.stats();
         assert_eq!(allocs, 0);
         assert_eq!(hits, 0);
-        
+
         // Miss on empty pool
         let _ = pool.try_alloc();
         let (_, _, misses, _) = pool.stats();
         assert_eq!(misses, 1);
-        
+
         // Add and retrieve
         pool.dealloc(42);
         let _ = pool.try_alloc();
@@ -53,12 +53,18 @@ mod lockfree_pool_tests {
             x: i32,
             y: String,
         }
-        
+
         let pool: LockFreePool<TestStruct> = LockFreePool::new();
-        
-        pool.dealloc(TestStruct { x: 1, y: "hello".to_string() });
-        pool.dealloc(TestStruct { x: 2, y: "world".to_string() });
-        
+
+        pool.dealloc(TestStruct {
+            x: 1,
+            y: "hello".to_string(),
+        });
+        pool.dealloc(TestStruct {
+            x: 2,
+            y: "world".to_string(),
+        });
+
         let item = pool.try_alloc().unwrap();
         assert_eq!(item.x, 2);
         assert_eq!(item.y, "world");
@@ -67,22 +73,22 @@ mod lockfree_pool_tests {
     #[test]
     fn test_lockfree_allocator_enable_disable() {
         let mut allocator = LockFreeAllocator::new();
-        
+
         // Starts enabled
         assert!(allocator.is_enabled());
-        
+
         // Can allocate when enabled
         let ptr = allocator.try_alloc(64, 8);
         assert!(ptr.is_some());
-        
+
         // Disable
         allocator.disable();
         assert!(!allocator.is_enabled());
-        
+
         // Cannot allocate when disabled
         let ptr = allocator.try_alloc(64, 8);
         assert!(ptr.is_none());
-        
+
         // Re-enable
         allocator.enable();
         assert!(allocator.is_enabled());
@@ -91,10 +97,10 @@ mod lockfree_pool_tests {
     #[test]
     fn test_lockfree_allocator_size_limit() {
         let allocator = LockFreeAllocator::new();
-        
+
         // Small allocations work
         assert!(allocator.try_alloc(512, 8).is_some());
-        
+
         // Large allocations (>1024) are rejected
         assert!(allocator.try_alloc(2048, 8).is_none());
     }
@@ -102,7 +108,7 @@ mod lockfree_pool_tests {
     #[test]
     fn test_lockfree_allocator_cache_hit_rate() {
         let allocator = LockFreeAllocator::new();
-        
+
         // Initial rate is 0.0 (no operations)
         assert_eq!(allocator.cache_hit_rate(), 0.0);
     }
@@ -112,7 +118,7 @@ mod lockfree_pool_tests {
         let stats = LockFreeStats::new();
         stats.record_allocation();
         stats.record_cache_hit();
-        
+
         let cloned = stats.clone();
         let (allocs, hits, _, _) = cloned.get_stats();
         assert_eq!(allocs, 1);
@@ -122,10 +128,10 @@ mod lockfree_pool_tests {
     #[test]
     fn test_lockfree_stats_cache_hit_rate() {
         let stats = LockFreeStats::new();
-        
+
         // No operations = 0.0
         assert_eq!(stats.cache_hit_rate(), 0.0);
-        
+
         // 2 hits, 2 misses = 0.5
         stats.record_cache_hit();
         stats.record_cache_hit();
@@ -137,10 +143,10 @@ mod lockfree_pool_tests {
     #[test]
     fn test_thread_slab_basic() {
         let mut slab = ThreadSlab::new();
-        
+
         // New slab has no remaining capacity
         assert_eq!(slab.remaining(), 0);
-        
+
         // Cannot allocate from empty slab
         assert!(slab.try_alloc(64, 8).is_none());
     }
@@ -182,7 +188,7 @@ mod debug_stats_tests {
     fn test_debug_stats_has_leak_reports() {
         let arena = Arena::new();
         let _ = arena.alloc(42u32);
-        
+
         let stats = arena.debug_stats();
         // leak_reports field exists and is initialized
         assert_eq!(stats.leak_reports, 0);
@@ -191,7 +197,7 @@ mod debug_stats_tests {
 
 #[cfg(feature = "thread_local")]
 mod thread_local_tests {
-    use arena_b::{reset_thread_cache, clear_thread_cache};
+    use arena_b::{clear_thread_cache, reset_thread_cache};
 
     #[test]
     fn test_thread_cache_functions_exist() {
