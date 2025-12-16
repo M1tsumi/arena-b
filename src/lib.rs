@@ -2681,8 +2681,9 @@ impl Arena {
 
         DebugStats {
             total_allocations,
-            active_checkpoints: debug_state.get_current_checkpoint_id(arena_id).saturating_sub(1)
-                as usize,
+            active_checkpoints: debug_state
+                .get_current_checkpoint_id(arena_id)
+                .saturating_sub(1) as usize,
             current_checkpoint_id: debug_state.get_current_checkpoint_id(arena_id),
             corrupted_allocations,
             leak_reports: 0, // Will be populated by leak_report() calls
