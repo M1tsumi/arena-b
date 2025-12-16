@@ -1,3 +1,5 @@
+#![cfg(not(feature = "single_thread_fast"))]
+
 use std::sync::Arc;
 use std::thread;
 

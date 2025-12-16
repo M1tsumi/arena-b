@@ -4,7 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased] - v0.8.0 - Enhanced Lock-Free Architecture & Pool Allocator Release
+## [Unreleased] - v0.9.0
+
+### ✨ New Features
+
+- **Slab Allocator Feature Flag (`slab`)**: Optional slab-backed size-class pooling for small allocations
+- **Arena Chunk Usage Telemetry**: Added `Arena::chunk_usage()` and `ArenaChunkUsage` for per-chunk capacity/used snapshots
+
+### 🛠 Improvements
+
+- **Internal Module Consolidation**: Gated the unused/duplicate `src/arena.rs` implementation behind the internal `arena_module` feature to prevent accidental compilation drift
+
+## v0.8.0 - Enhanced Lock-Free Architecture & Pool Allocator Release
 
 ### ✨ New Features
 

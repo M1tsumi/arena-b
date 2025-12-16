@@ -1,6 +1,6 @@
 [package]
 name = "arena-b"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Ultra-fast bump allocation arena with specialized allocation methods for parsers, game engines, and data processing"
@@ -35,6 +35,9 @@ virtual_memory = []
 thread_local = []
 lockfree = []
 debug = []
+slab = []
+arena_module = []
+single_thread_fast = []
 
 [[bench]]
 name = "arena_vs_box"

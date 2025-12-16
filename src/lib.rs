@@ -10,6 +10,8 @@
 
 use cfg_if::cfg_if;
 use std::alloc::{alloc, dealloc, Layout};
+#[cfg(feature = "single_thread_fast")]
+use std::cell::Cell;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -21,6 +23,14 @@ use std::sync::{
     Mutex,
 };
 use std::vec::Vec;
+
+mod size_classes;
+
+#[cfg(all(feature = "single_thread_fast", feature = "lockfree"))]
+compile_error!("feature `single_thread_fast` is incompatible with `lockfree` (Arena is not Send and chunk usage tracking is non-atomic)");
+
+#[cfg(feature = "slab")]
+mod slab;
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
@@ -957,15 +967,91 @@ cfg_if! {
 const FAST_ALLOC_THRESHOLD: usize = 1024; // Fast path for small allocations
 const PREFETCH_WARMUP_SIZE: usize = 8; // Number of cache lines to prefetch
 
-// Size classes for optimized allocation
-const SIZE_CLASSES: &[usize] = &[8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096];
+use size_classes::SIZE_CLASSES;
+
+#[repr(transparent)]
+struct UsedCounter {
+    #[cfg(not(feature = "single_thread_fast"))]
+    inner: AtomicUsize,
+    #[cfg(feature = "single_thread_fast")]
+    inner: Cell<usize>,
+}
+
+impl UsedCounter {
+    #[inline]
+    fn new(value: usize) -> Self {
+        Self {
+            #[cfg(not(feature = "single_thread_fast"))]
+            inner: AtomicUsize::new(value),
+            #[cfg(feature = "single_thread_fast")]
+            inner: Cell::new(value),
+        }
+    }
+
+    #[inline]
+    fn load(&self, ordering: Ordering) -> usize {
+        #[cfg(not(feature = "single_thread_fast"))]
+        {
+            self.inner.load(ordering)
+        }
+        #[cfg(feature = "single_thread_fast")]
+        {
+            let _ = ordering;
+            self.inner.get()
+        }
+    }
+
+    #[inline]
+    fn store(&self, value: usize, ordering: Ordering) {
+        #[cfg(not(feature = "single_thread_fast"))]
+        {
+            self.inner.store(value, ordering);
+        }
+        #[cfg(feature = "single_thread_fast")]
+        {
+            let _ = ordering;
+            self.inner.set(value);
+        }
+    }
+
+    #[inline]
+    fn compare_exchange_weak(
+        &self,
+        current: usize,
+        new: usize,
+        success: Ordering,
+        failure: Ordering,
+    ) -> Result<usize, usize> {
+        #[cfg(not(feature = "single_thread_fast"))]
+        {
+            self.inner
+                .compare_exchange_weak(current, new, success, failure)
+        }
+        #[cfg(feature = "single_thread_fast")]
+        {
+            let _ = (success, failure);
+            let observed = self.inner.get();
+            if observed == current {
+                self.inner.set(new);
+                Ok(observed)
+            } else {
+                Err(observed)
+            }
+        }
+    }
+}
+
+#[cfg(feature = "slab")]
+use slab::SlabAllocator as MemoryPool;
 
 // Custom memory pool for frequently used sizes
+#[cfg(not(feature = "slab"))]
 #[repr(align(64))]
 struct MemoryPool {
     pools: [Vec<NonNull<u8>>; SIZE_CLASSES.len()],
 }
 
+#[cfg(not(feature = "slab"))]
 impl MemoryPool {
     fn new() -> Self {
         Self {
@@ -1044,7 +1130,7 @@ impl DebugGuard {
 struct Chunk {
     ptr: NonNull<u8>,
     capacity: usize,
-    used: AtomicUsize,
+    used: UsedCounter,
     _padding: [u8; 64 - 3 * 8], // Cache line padding
 }
 
@@ -1054,7 +1140,7 @@ struct Chunk {
 struct VirtualChunk {
     region: UnsafeCell<virtual_memory::VirtualMemoryRegion>,
     capacity: usize,
-    used: AtomicUsize,
+    used: UsedCounter,
     _padding: [u8; 64 - 3 * 8], // Cache line padding
 }
 
@@ -1065,7 +1151,7 @@ impl VirtualChunk {
         Ok(Self {
             region: UnsafeCell::new(region),
             capacity: reserve_size,
-            used: AtomicUsize::new(0),
+            used: UsedCounter::new(0),
             _padding: [0; 64 - 3 * 8],
         })
     }
@@ -1178,6 +1264,12 @@ pub struct ArenaStats {
     pub bytes_used: usize,
     pub allocation_count: usize,
     pub chunk_count: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ArenaChunkUsage {
+    pub capacity: usize,
+    pub used: usize,
 }
 
 pub struct ArenaBuilder {
@@ -1563,8 +1655,11 @@ impl Arena {
             let addr = ptr.as_ptr() as usize;
             let aligned_addr = (addr + align - 1) & !(align - 1);
             if aligned_addr != addr {
-                // Misaligned, fallback to arena allocation
-                pool.dealloc(ptr, size);
+                // Misaligned for this request.
+                // Do not put it back into the pool, otherwise we can repeatedly pop the same
+                // unusable pointer for higher-alignment allocations.
+                let layout = Layout::from_size_align(size, 8).unwrap();
+                std::alloc::dealloc(ptr.as_ptr(), layout);
                 return None;
             }
 
@@ -1736,7 +1831,23 @@ impl Arena {
                 .is_ok()
             {
                 self.record_allocation(end - current);
-                return chunk.ptr.as_ptr().add(aligned);
+                let ptr = chunk.ptr.as_ptr().add(aligned);
+
+                // Keep debug tracking consistent across allocation paths.
+                #[cfg(feature = "debug")]
+                {
+                    let arena_id = self as *const Arena as usize;
+                    let inner = unsafe { &*self.inner.get() };
+                    let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+                    debug_state.register_allocation(
+                        arena_id,
+                        ptr,
+                        size,
+                        inner.current_checkpoint_id,
+                    );
+                }
+
+                return ptr;
             }
         }
 
@@ -2272,6 +2383,19 @@ impl Arena {
         }
     }
 
+    #[inline]
+    pub fn chunk_usage(&self) -> Vec<ArenaChunkUsage> {
+        let inner = unsafe { &*self.inner.get() };
+        inner
+            .chunks
+            .iter()
+            .map(|c| ArenaChunkUsage {
+                capacity: c.capacity,
+                used: c.used.load(Ordering::Relaxed),
+            })
+            .collect()
+    }
+
     /// Returns the number of bytes currently used in the underlying chunk.
     #[inline]
     pub fn bytes_allocated(&self) -> usize {
@@ -2316,7 +2440,7 @@ impl Arena {
     /// ```
     #[inline]
     pub fn checkpoint(&self) -> ArenaCheckpoint {
-        let inner = unsafe { &*self.inner.get() };
+        let inner = unsafe { &mut *self.inner.get() };
         let current_chunk_idx = inner.current_chunk.load(Ordering::Acquire);
         let current_chunk = &inner.chunks[current_chunk_idx];
         let chunk_offset = current_chunk.used.load(Ordering::Relaxed);
@@ -2333,8 +2457,13 @@ impl Arena {
         #[cfg(feature = "debug")]
         let checkpoint_id = {
             let arena_id = self as *const Arena as usize;
-            let debug_state = debug::DEBUG_STATE.read().unwrap();
-            debug_state.get_current_checkpoint_id(arena_id)
+            let id = inner.current_checkpoint_id;
+            inner.current_checkpoint_id = inner.current_checkpoint_id.saturating_add(1);
+            let mut debug_state = debug::DEBUG_STATE.write().unwrap();
+            debug_state
+                .current_checkpoint_ids
+                .insert(arena_id, inner.current_checkpoint_id);
+            id
         };
 
         let mut checkpoint = ArenaCheckpoint {
@@ -2629,7 +2758,9 @@ impl Arena {
 
         DebugStats {
             total_allocations,
-            active_checkpoints: inner.checkpoints.len(),
+            active_checkpoints: debug_state
+                .get_current_checkpoint_id(arena_id)
+                .saturating_sub(1) as usize,
             current_checkpoint_id: debug_state.get_current_checkpoint_id(arena_id),
             corrupted_allocations,
             leak_reports: 0, // Will be populated by leak_report() calls
@@ -2649,6 +2780,7 @@ impl Drop for Arena {
     }
 }
 
+#[cfg(not(feature = "single_thread_fast"))]
 unsafe impl Send for Arena {}
 
 unsafe fn allocate_chunk(capacity: usize) -> Chunk {
@@ -2660,7 +2792,7 @@ unsafe fn allocate_chunk(capacity: usize) -> Chunk {
     Chunk {
         ptr: unsafe { NonNull::new_unchecked(ptr) },
         capacity,
-        used: AtomicUsize::new(0),
+        used: UsedCounter::new(0),
         _padding: [0; 64 - 3 * 8],
     }
 }
@@ -2842,16 +2974,19 @@ impl<'pool, T> Drop for Pooled<'pool, T> {
     }
 }
 
+#[cfg(not(feature = "single_thread_fast"))]
 pub struct SyncArena {
     inner: Mutex<Arena>,
 }
 
+#[cfg(not(feature = "single_thread_fast"))]
 impl Default for SyncArena {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(not(feature = "single_thread_fast"))]
 impl SyncArena {
     pub fn new() -> Self {
         SyncArena {

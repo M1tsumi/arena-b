@@ -6,7 +6,7 @@
 ![Rust](https://img.shields.io/badge/language-Rust-orange.svg)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 
-A high-performance bump allocator for Rust, designed for scenarios where you need to allocate many temporary objects and deallocate them all at once. Ideal for parsers, game engines, compilers, and request-scoped web server data.
+A high-performance bump allocator for Rust for workloads that create lots of short-lived objects and want to free them all at once. It’s a good fit for parsers/ASTs, game frames, compilers, and request-scoped web server data.
 
 ## Overview
 
@@ -40,6 +40,12 @@ fn main() {
 - **Lock-Free Object Pool** *(v0.8)*: Generic `LockFreePool<T>` for zero-contention object reuse in high-frequency allocation patterns
 - **Advanced Debugging** *(v0.6)*: Leak detection, validation hooks, and optional backtraces make it easier to audit arena usage during development
 - **Virtual Memory Instrumentation** *(v0.6)*: Inspect committed bytes at runtime and rely on improved macOS/Windows handling for large reserves
+
+## What's New in v0.9
+
+- **Slab allocator feature flag (`slab`)**: Optional size-class caching for small allocations
+- **Arena chunk usage telemetry**: `Arena::chunk_usage()` and `ArenaChunkUsage` provide per-chunk used/capacity snapshots
+- **Debug consistency across fast paths**: Debug tracking covers fast-path allocations and checkpoint bookkeeping reliably when `debug` is enabled
 
 ## What's New in v0.8
 
@@ -77,7 +83,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-arena-b = "0.8"
+arena-b = "0.9"
 ```
 
 Or via the command line:
@@ -92,13 +98,13 @@ Enable features based on your requirements:
 
 ```toml
 # Basic bump allocator
-arena-b = "0.8"
+arena-b = "0.9"
 
 # With debug safety checks (recommended for development)
-arena-b = { version = "0.8", features = ["debug"] }
+arena-b = { version = "0.9", features = ["debug"] }
 
 # Full feature set for maximum performance
-arena-b = { version = "0.8", features = ["debug", "virtual_memory", "thread_local", "lockfree"] }
+arena-b = { version = "0.9", features = ["debug", "virtual_memory", "thread_local", "lockfree", "slab"] }
 ```
 
 | Feature | Description |
@@ -108,6 +114,7 @@ arena-b = { version = "0.8", features = ["debug", "virtual_memory", "thread_loca
 | `thread_local` | Per-thread allocation buffers to reduce contention |
 | `lockfree` | Lock-free operations for concurrent workloads |
 | `stats` | Allocation statistics tracking (enabled by default) |
+| `slab` | Optional slab-backed size-class cache for small allocations |
 
 ## Usage Examples
 
@@ -289,25 +296,8 @@ Licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 See [CHANGELOG.md](CHANGELOG.md) for complete version history.
 
-### v0.8.0
-- Generic `LockFreePool<T>` for thread-safe object pooling
-- `LockFreeAllocator` with runtime enable/disable control
-- `ThreadSlab` for per-thread fast-path allocations
-- Enhanced `LockFreeStats` with `cache_hit_rate()` and `Clone`
-- `DebugStats` now includes `leak_reports` field
+### v0.9.0
 
-### v0.7.0
-- `reserve_additional` for proactive capacity growth
-- `shrink_to_fit` and `reset_and_shrink` for memory trimming
-
-### v0.6.0
-- AVX2/NEON SIMD optimizations
-- `alloc_slice_fast` and `alloc_str_uninit` APIs
-- Virtual memory telemetry and cross-platform fixes
-- Panic-safe scopes
-
-### v0.5.0
-- Checkpoint and rewind API for bulk deallocation
-- Debug mode with memory safety validation
-- Virtual memory support for large allocations
-- Thread-local caching and lock-free operations
+- Slab allocator size-class cache (`slab` feature)
+- `Arena::chunk_usage()` telemetry for per-chunk capacity/used
+- Debug tracking consistency across fast allocation paths

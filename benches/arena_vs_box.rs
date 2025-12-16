@@ -7,16 +7,20 @@ use criterion::{criterion_group, criterion_main, Criterion};
 fn bench_arena_alloc(c: &mut Criterion) {
     let mut group = c.benchmark_group("alloc_u64");
     group.bench_function("arena_alloc", |b| {
+        let arena = Arena::with_capacity(1024);
         b.iter(|| {
-            let arena = Arena::with_capacity(1024);
+            let checkpoint = arena.checkpoint();
             let x = arena.alloc(black_box(42_u64));
             black_box(*x);
-        });
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
+        })
     });
     group.bench_function("box_new", |b| {
         b.iter(|| {
+            let mut out: Vec<Box<u64>> = Vec::with_capacity(1);
             let x = Box::new(black_box(42_u64));
-            black_box(x)
+            out.push(x);
+            black_box(out)
         });
     });
     group.finish();
@@ -26,16 +30,21 @@ fn bench_arena_alloc_sizes(c: &mut Criterion) {
     let mut group = c.benchmark_group("alloc_var_sizes");
     for &len in &[8_usize, 256, 4096] {
         group.bench_with_input(format!("arena_u8_{}", len), &len, |b, &len| {
+            let arena = Arena::with_capacity(len * 2);
             b.iter(|| {
-                let arena = Arena::with_capacity(len * 2);
+                let checkpoint = arena.checkpoint();
                 let slice = arena.alloc_slice_uninit::<u8>(len);
                 black_box(slice);
-            });
+                unsafe { arena.rewind_to_checkpoint(checkpoint) };
+            })
         });
         group.bench_with_input(format!("vec_u8_{}", len), &len, |b, &len| {
             b.iter(|| {
+                let mut out: Vec<Vec<u8>> = Vec::with_capacity(1);
                 let v = vec![0_u8; len];
-                black_box(v);
+                out.push(v);
+                // Ensure the allocation escapes the loop body.
+                black_box(out);
             });
         });
     }
@@ -47,21 +56,26 @@ fn bench_many_allocs(c: &mut Criterion) {
     const N: usize = 1024;
 
     group.bench_function("arena_many", |b| {
+        let arena = Arena::with_capacity(N * std::mem::size_of::<u64>() * 2);
         b.iter(|| {
-            let arena = Arena::with_capacity(N * std::mem::size_of::<u64>() * 2);
+            let checkpoint = arena.checkpoint();
             for i in 0..N {
                 let x = arena.alloc(black_box(i as u64));
                 black_box(*x);
             }
-        });
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
+        })
     });
 
     group.bench_function("box_many", |b| {
         b.iter(|| {
+            let mut out: Vec<Box<u64>> = Vec::with_capacity(N);
             for i in 0..N {
                 let x = Box::new(black_box(i as u64));
-                black_box(*x);
+                out.push(x);
             }
+            // Ensure allocations escape the loop body.
+            black_box(out);
         });
     });
 
