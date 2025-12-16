@@ -32,16 +32,22 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: |
+          cargo clippy --all-targets --features "debug,virtual_memory,thread_local,lockfree,slab" -- -D warnings
+          cargo clippy --all-targets --features "single_thread_fast,debug,virtual_memory,thread_local,slab" -- -D warnings
 
-      - name: Cargo test (all features)
-        run: cargo test --all-features
+      - name: Cargo test (feature sets)
+        run: |
+          cargo test --features "debug,virtual_memory,thread_local,lockfree,slab"
+          cargo test --features "single_thread_fast,debug,virtual_memory,thread_local,slab"
 
       - name: Cargo test (no default features)
         run: cargo test --no-default-features --tests
 
       - name: Cargo doc
-        run: cargo doc --no-deps --all-features
+        run: |
+          cargo doc --no-deps --features "debug,virtual_memory,thread_local,lockfree,slab"
+          cargo doc --no-deps --features "single_thread_fast,debug,virtual_memory,thread_local,slab"
 
   bench:
     runs-on: ubuntu-latest

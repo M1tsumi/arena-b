@@ -10,6 +10,8 @@
 
 use cfg_if::cfg_if;
 use std::alloc::{alloc, dealloc, Layout};
+#[cfg(feature = "single_thread_fast")]
+use std::cell::Cell;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -23,6 +25,9 @@ use std::sync::{
 use std::vec::Vec;
 
 mod size_classes;
+
+#[cfg(all(feature = "single_thread_fast", feature = "lockfree"))]
+compile_error!("feature `single_thread_fast` is incompatible with `lockfree` (Arena is not Send and chunk usage tracking is non-atomic)");
 
 #[cfg(feature = "slab")]
 mod slab;
@@ -964,6 +969,78 @@ const PREFETCH_WARMUP_SIZE: usize = 8; // Number of cache lines to prefetch
 
 use size_classes::SIZE_CLASSES;
 
+#[repr(transparent)]
+struct UsedCounter {
+    #[cfg(not(feature = "single_thread_fast"))]
+    inner: AtomicUsize,
+    #[cfg(feature = "single_thread_fast")]
+    inner: Cell<usize>,
+}
+
+impl UsedCounter {
+    #[inline]
+    fn new(value: usize) -> Self {
+        Self {
+            #[cfg(not(feature = "single_thread_fast"))]
+            inner: AtomicUsize::new(value),
+            #[cfg(feature = "single_thread_fast")]
+            inner: Cell::new(value),
+        }
+    }
+
+    #[inline]
+    fn load(&self, ordering: Ordering) -> usize {
+        #[cfg(not(feature = "single_thread_fast"))]
+        {
+            self.inner.load(ordering)
+        }
+        #[cfg(feature = "single_thread_fast")]
+        {
+            let _ = ordering;
+            self.inner.get()
+        }
+    }
+
+    #[inline]
+    fn store(&self, value: usize, ordering: Ordering) {
+        #[cfg(not(feature = "single_thread_fast"))]
+        {
+            self.inner.store(value, ordering);
+        }
+        #[cfg(feature = "single_thread_fast")]
+        {
+            let _ = ordering;
+            self.inner.set(value);
+        }
+    }
+
+    #[inline]
+    fn compare_exchange_weak(
+        &self,
+        current: usize,
+        new: usize,
+        success: Ordering,
+        failure: Ordering,
+    ) -> Result<usize, usize> {
+        #[cfg(not(feature = "single_thread_fast"))]
+        {
+            self.inner
+                .compare_exchange_weak(current, new, success, failure)
+        }
+        #[cfg(feature = "single_thread_fast")]
+        {
+            let _ = (success, failure);
+            let observed = self.inner.get();
+            if observed == current {
+                self.inner.set(new);
+                Ok(observed)
+            } else {
+                Err(observed)
+            }
+        }
+    }
+}
+
 #[cfg(feature = "slab")]
 use slab::SlabAllocator as MemoryPool;
 
@@ -1053,7 +1130,7 @@ impl DebugGuard {
 struct Chunk {
     ptr: NonNull<u8>,
     capacity: usize,
-    used: AtomicUsize,
+    used: UsedCounter,
     _padding: [u8; 64 - 3 * 8], // Cache line padding
 }
 
@@ -1063,7 +1140,7 @@ struct Chunk {
 struct VirtualChunk {
     region: UnsafeCell<virtual_memory::VirtualMemoryRegion>,
     capacity: usize,
-    used: AtomicUsize,
+    used: UsedCounter,
     _padding: [u8; 64 - 3 * 8], // Cache line padding
 }
 
@@ -1074,7 +1151,7 @@ impl VirtualChunk {
         Ok(Self {
             region: UnsafeCell::new(region),
             capacity: reserve_size,
-            used: AtomicUsize::new(0),
+            used: UsedCounter::new(0),
             _padding: [0; 64 - 3 * 8],
         })
     }
@@ -2703,6 +2780,7 @@ impl Drop for Arena {
     }
 }
 
+#[cfg(not(feature = "single_thread_fast"))]
 unsafe impl Send for Arena {}
 
 unsafe fn allocate_chunk(capacity: usize) -> Chunk {
@@ -2714,7 +2792,7 @@ unsafe fn allocate_chunk(capacity: usize) -> Chunk {
     Chunk {
         ptr: unsafe { NonNull::new_unchecked(ptr) },
         capacity,
-        used: AtomicUsize::new(0),
+        used: UsedCounter::new(0),
         _padding: [0; 64 - 3 * 8],
     }
 }
@@ -2896,16 +2974,19 @@ impl<'pool, T> Drop for Pooled<'pool, T> {
     }
 }
 
+#[cfg(not(feature = "single_thread_fast"))]
 pub struct SyncArena {
     inner: Mutex<Arena>,
 }
 
+#[cfg(not(feature = "single_thread_fast"))]
 impl Default for SyncArena {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(not(feature = "single_thread_fast"))]
 impl SyncArena {
     pub fn new() -> Self {
         SyncArena {

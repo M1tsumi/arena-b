@@ -37,6 +37,7 @@ lockfree = []
 debug = []
 slab = []
 arena_module = []
+single_thread_fast = []
 
 [[bench]]
 name = "arena_vs_box"
