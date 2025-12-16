@@ -1,3 +1,4 @@
+#![cfg(feature = "arena_module")]
 //! Main Arena interface and public API
 
 use core::alloc::Layout;
