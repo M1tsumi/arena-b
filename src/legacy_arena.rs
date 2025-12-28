@@ -276,6 +276,7 @@ impl Arena {
         }
     }
 
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn rewind_to_checkpoint(&self, checkpoint: ArenaCheckpoint) {
         let inner = &mut *self.inner.get();
 

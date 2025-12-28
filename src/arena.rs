@@ -176,6 +176,7 @@ where
     /// The provided `checkpoint` must have been produced by this `Scope`'s
     /// arena and must represent a valid point in the arena's history. Calling
     /// this with an invalid checkpoint can lead to undefined behavior.
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn rewind_to_checkpoint(&self, checkpoint: ArenaCheckpoint) {
         self.arena.rewind_to_checkpoint(checkpoint);
     }
@@ -702,6 +703,7 @@ impl Arena {
     /// After calling `reset`, any references previously returned from this
     /// `Arena` may be invalidated. Callers must ensure there are no live
     /// references into the arena before invoking this method.
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn reset(&mut self) {
         let inner = &mut *self.inner.get();
         for chunk in &mut inner.chunks {
@@ -746,6 +748,7 @@ impl Arena {
     ///
     /// The provided `checkpoint` must have been produced by this arena and
     /// represent a valid prior state; otherwise behavior is undefined.
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn rewind_to_checkpoint(&self, checkpoint: ArenaCheckpoint) {
         let inner = unsafe { &mut *self.inner.get() };
         inner.rewind_to_checkpoint(checkpoint);
@@ -782,6 +785,7 @@ impl Arena {
     ///
     /// Panics if there are no checkpoints on the stack.
     #[inline]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn pop_and_rewind(&mut self) -> crate::ArenaCheckpoint {
         let inner = &mut *self.inner.get();
         let checkpoint = inner
@@ -846,6 +850,7 @@ impl Arena {
     /// ```
     #[cfg(feature = "debug")]
     #[inline]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn check_valid<T>(&self, reference: &T) -> Result<(), String> {
         let arena_id = self as *const Arena as usize;
         let ptr = reference as *const T as *mut u8;
