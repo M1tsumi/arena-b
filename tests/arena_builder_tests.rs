@@ -4,7 +4,7 @@ mod tests {
 
     #[test]
     fn test_arena_builder_basic() {
-        let _arena = ArenaBuilder::new()
+        let arena = ArenaBuilder::new()
             .initial_capacity(1024)
             .chunk_size(512)
             .build();

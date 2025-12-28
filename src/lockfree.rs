@@ -138,12 +138,22 @@ const MAX_LOCKFREE_ALLOCATION: usize = 1024;
 const SLAB_MIN_BLOCK: usize = 256;
 
 // Lock-free buffer for small allocations
+#[cfg(feature = "single_thread_fast")]
 pub struct LockFreeBuffer {
     buffer: Cell<*mut u8>,
     offset: Cell<usize>,
     capacity: usize,
     stats: Arc<LockFreeStats>,
     generation: Cell<usize>,
+}
+
+#[cfg(not(feature = "single_thread_fast"))]
+pub struct LockFreeBuffer {
+    buffer: AtomicPtr<u8>,
+    offset: AtomicUsize,
+    capacity: usize,
+    stats: Arc<LockFreeStats>,
+    generation: AtomicUsize,
 }
 
 impl LockFreeBuffer {
@@ -240,14 +250,30 @@ impl LockFreeBuffer {
 
     pub fn reset(&self) {
         // Reset offset to 0
-        self.offset.set(0);
-        self.generation.set(self.generation.get() + 1);
+        #[cfg(feature = "single_thread_fast")]
+        {
+            self.offset.set(0);
+            self.generation.set(self.generation.get() + 1);
 
-        // Zero out the buffer for security
-        let buffer_ptr = self.buffer.get();
-        if !buffer_ptr.is_null() {
-            unsafe {
-                std::ptr::write_bytes(buffer_ptr, 0, self.capacity);
+            // Zero out the buffer for security
+            let buffer_ptr = self.buffer.get();
+            if !buffer_ptr.is_null() {
+                unsafe {
+                    std::ptr::write_bytes(buffer_ptr, 0, self.capacity);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "single_thread_fast"))]
+        {
+            self.offset.store(0, Ordering::Release);
+            self.generation.fetch_add(1, Ordering::AcqRel);
+
+            let buffer_ptr = self.buffer.load(Ordering::Acquire);
+            if !buffer_ptr.is_null() {
+                unsafe {
+                    std::ptr::write_bytes(buffer_ptr, 0, self.capacity);
+                }
             }
         }
 
@@ -275,7 +301,10 @@ impl LockFreeBuffer {
     }
 
     fn refill_thread_slab_and_alloc(&self, size: usize, align: usize) -> Option<*mut u8> {
+        #[cfg(feature = "single_thread_fast")]
         let buffer_ptr = self.buffer.get();
+        #[cfg(not(feature = "single_thread_fast"))]
+        let buffer_ptr = self.buffer.load(Ordering::Acquire);
         if buffer_ptr.is_null() {
             return None;
         }
@@ -283,7 +312,10 @@ impl LockFreeBuffer {
         let block_size = align_up(cmp::max(size, SLAB_MIN_BLOCK), LOCKFREE_ALIGNMENT);
 
         loop {
+            #[cfg(feature = "single_thread_fast")]
             let current = self.offset.get();
+            #[cfg(not(feature = "single_thread_fast"))]
+            let current = self.offset.load(Ordering::Acquire);
             let start = align_up(current, LOCKFREE_ALIGNMENT);
             let end = start + block_size;
 
@@ -292,18 +324,41 @@ impl LockFreeBuffer {
                 return None;
             }
 
-            if self.offset.get() == current {
-                self.offset.set(end);
-                let generation = self.generation.get();
-                return THREAD_SLAB.with(|cell| {
-                    let mut slab = cell.get();
-                    slab.set_region(self as *const _, buffer_ptr, start, end, generation);
-                    self.stats.record_allocation(); // Record allocation
-                    slab.try_alloc(size, align)
-                });
-            } else {
-                self.stats.record_contention(); // Record contention on failure
-                continue;
+            #[cfg(feature = "single_thread_fast")]
+            {
+                if self.offset.get() == current {
+                    self.offset.set(end);
+                    let generation = self.generation.get();
+                    return THREAD_SLAB.with(|cell| {
+                        let mut slab = cell.get();
+                        slab.set_region(self as *const _, buffer_ptr, start, end, generation);
+                        self.stats.record_allocation(); // Record allocation
+                        slab.try_alloc(size, align)
+                    });
+                } else {
+                    self.stats.record_contention(); // Record contention on failure
+                    continue;
+                }
+            }
+
+            #[cfg(not(feature = "single_thread_fast"))]
+            {
+                if self
+                    .offset
+                    .compare_exchange(current, end, Ordering::AcqRel, Ordering::Acquire)
+                    .is_ok()
+                {
+                    let generation = self.generation.load(Ordering::Acquire);
+                    return THREAD_SLAB.with(|cell| {
+                        let mut slab = cell.get();
+                        slab.set_region(self as *const _, buffer_ptr, start, end, generation);
+                        self.stats.record_allocation(); // Record allocation
+                        slab.try_alloc(size, align)
+                    });
+                } else {
+                    self.stats.record_contention(); // Record contention on failure
+                    continue;
+                }
             }
         }
     }
