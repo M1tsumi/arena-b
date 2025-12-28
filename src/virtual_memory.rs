@@ -22,6 +22,9 @@ pub struct VirtualMemoryRegion {
 
 impl VirtualMemoryRegion {
     pub fn new(reserve_size: usize) -> Result<Self, &'static str> {
+        if reserve_size == 0 {
+            return Err("Reserve size must be nonzero");
+        }
         let reserve_size = reserve_size.clamp(PAGE_SIZE, MAX_RESERVE_SIZE);
         let reserve_size = (reserve_size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
 
@@ -157,23 +160,27 @@ impl VirtualMemoryRegion {
             #[cfg(windows)]
             {
                 use windows_sys::Win32::System::Memory::{VirtualFree, MEM_DECOMMIT};
+                eprintln!("Decommitting: ptr={:?} size={}", decommit_ptr, size);
                 let result = VirtualFree(
                     decommit_ptr as *mut _,
                     size,
                     MEM_DECOMMIT,
                 );
                 if result == 0 {
+                    eprintln!("VirtualFree failed: ptr={:?} size={}", decommit_ptr, size);
                     return Err("Failed to decommit virtual memory");
                 }
             }
             #[cfg(unix)]
             {
+                eprintln!("Decommitting: ptr={:?} size={}", decommit_ptr, size);
                 let result = libc::mprotect(
                     decommit_ptr as *mut libc::c_void,
                     size,
                     libc::PROT_NONE,
                 );
                 if result != 0 {
+                    eprintln!("mprotect failed: ptr={:?} size={} errno={}", decommit_ptr, size, *libc::__errno_location());
                     return Err("Failed to decommit virtual memory");
                 }
 
