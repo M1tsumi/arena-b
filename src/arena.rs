@@ -361,21 +361,32 @@ impl Arena {
             if size <= 1024 {
                 let inner = unsafe { &*self.inner.get() };
                 if let Some(ref buffer) = inner.lockfree_buffer {
-                    if let Some(ptr) = buffer.try_alloc(size, align) {
-                        self.lockfree_stats.record_allocation();
-                        self.lockfree_stats.record_cache_hit();
+                        if let Some(ptr) = buffer.try_alloc(size, align) {
+                            self.lockfree_stats.record_allocation();
+                            self.lockfree_stats.record_cache_hit();
 
-                        #[cfg(feature = "debug")]
-                        {
-                            let arena_id = self.debug_allocator.arena_id();
-                            crate::debug::register_allocation(arena_id, ptr, size, inner.current_checkpoint_id);
-                        }
-                        #[cfg(feature = "stats")]
-                        {
-                            inner.stats().bytes_used.fetch_add(size, Ordering::Relaxed);
-                            inner.stats().allocation_count.fetch_add(1, Ordering::Relaxed);
-                        }
-                        return ptr;
+                            #[cfg(feature = "debug")]
+                            {
+                                let arena_id = self.debug_allocator.arena_id();
+                                // Wrap the raw arena pointer with a debug guard allocation
+                                let guarded = self.debug_allocator.allocate_with_guard(ptr, size, inner.current_checkpoint_id);
+                                #[cfg(feature = "stats")]
+                                {
+                                    inner.stats().bytes_used.fetch_add(size, Ordering::Relaxed);
+                                    inner.stats().allocation_count.fetch_add(1, Ordering::Relaxed);
+                                }
+                                return guarded;
+                            }
+
+                            #[cfg(not(feature = "debug"))]
+                            {
+                                #[cfg(feature = "stats")]
+                                {
+                                    inner.stats().bytes_used.fetch_add(size, Ordering::Relaxed);
+                                    inner.stats().allocation_count.fetch_add(1, Ordering::Relaxed);
+                                }
+                                return ptr;
+                            }
                     } else {
                         self.lockfree_stats.record_cache_miss();
                         self.lockfree_stats.record_contention();
@@ -388,19 +399,33 @@ impl Arena {
         #[cfg(feature = "thread_local")]
         {
             if size <= 512 {
+                #[cfg(feature = "debug")]
                 let arena_id = self.debug_allocator.arena_id();
+                #[cfg(not(feature = "debug"))]
+                let arena_id = 0usize;
+
                 if let Some(ptr) = crate::thread_local::try_thread_local_alloc(arena_id, size, align) {
                     #[cfg(feature = "debug")]
                     {
                         let inner = unsafe { &*self.inner.get() };
-                        crate::debug::register_allocation(arena_id, ptr, size, inner.current_checkpoint_id);
+                        let guarded = self.debug_allocator.allocate_with_guard(ptr, size, inner.current_checkpoint_id);
+                        #[cfg(feature = "stats")]
+                        {
+                            let inner = unsafe { &*self.inner.get() };
+                            inner.stats().allocation_count.fetch_add(1, Ordering::Relaxed);
+                        }
+                        return guarded;
                     }
-                    #[cfg(feature = "stats")]
+
+                    #[cfg(not(feature = "debug"))]
                     {
-                        let inner = unsafe { &*self.inner.get() };
-                        inner.stats().allocation_count.fetch_add(1, Ordering::Relaxed);
+                        #[cfg(feature = "stats")]
+                        {
+                            let inner = unsafe { &*self.inner.get() };
+                            inner.stats().allocation_count.fetch_add(1, Ordering::Relaxed);
+                        }
+                        return ptr;
                     }
-                    return ptr;
                 }
             }
         }
@@ -411,9 +436,15 @@ impl Arena {
             #[cfg(feature = "debug")]
             {
                 let arena_id = self.debug_allocator.arena_id();
-                crate::debug::register_allocation(arena_id, ptr, size, inner.current_checkpoint_id);
+                let guarded = self.debug_allocator.allocate_with_guard(ptr, size, inner.current_checkpoint_id);
+                crate::debug::register_allocation(arena_id, guarded, size, inner.current_checkpoint_id);
+                return guarded;
             }
-            return ptr;
+
+            #[cfg(not(feature = "debug"))]
+            {
+                return ptr;
+            }
         }
 
         // Need new chunk
@@ -430,10 +461,14 @@ impl Arena {
                 if let Some(ptr) = inner.allocate(layout) {
                     #[cfg(feature = "debug")]
                     {
-                        let arena_id = self.debug_allocator.arena_id();
-                        crate::debug::register_allocation(arena_id, ptr, size, inner.current_checkpoint_id);
+                        let guarded = self.debug_allocator.allocate_with_guard(ptr, size, inner.current_checkpoint_id);
+                        return guarded;
                     }
-                    ptr
+
+                    #[cfg(not(feature = "debug"))]
+                    {
+                        ptr
+                    }
                 } else {
                     ptr::null_mut()
                 }

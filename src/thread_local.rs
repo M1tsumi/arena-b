@@ -91,16 +91,14 @@ impl ThreadCache {
 
     fn clear(&mut self) {
         for i in 0..self.used {
-            // Deallocate all cached pointers
-            unsafe {
-                let size = self.entries[i].size;
-                if size > 0 {
-                    if let Ok(layout) = Layout::from_size_align(size, CACHE_ALIGNMENT) {
-                        dealloc(self.entries[i].ptr, layout);
-                    } else if let Ok(fallback) = Layout::from_size_align(CACHE_ALIGNMENT, CACHE_ALIGNMENT) {
-                        dealloc(self.entries[i].ptr, fallback);
-                    }
-                }
+            // Deallocate all cached pointers (skipped)
+            let size = self.entries[i].size;
+            if size > 0 {
+                // Do not deallocate cached pointers here. Cached entries
+                // may point inside arena chunks or other owners and
+                // freeing them can cause double-free. Skip deallocation
+                // to avoid freeing memory we don't own.
+                eprintln!("[ThreadCache::clear] skipping dealloc ptr={:p} size={}", self.entries[i].ptr, self.entries[i].size);
             }
         }
         self.used = 0;
@@ -111,15 +109,10 @@ impl ThreadCache {
         // Clear half the entries
         let clear_count = self.used / 2;
         for i in 0..clear_count {
-            unsafe {
-                let size = self.entries[i].size;
-                if size > 0 {
-                    if let Ok(layout) = Layout::from_size_align(size, CACHE_ALIGNMENT) {
-                        dealloc(self.entries[i].ptr, layout);
-                    } else if let Ok(fallback) = Layout::from_size_align(CACHE_ALIGNMENT, CACHE_ALIGNMENT) {
-                        dealloc(self.entries[i].ptr, fallback);
-                    }
-                }
+            let size = self.entries[i].size;
+            if size > 0 {
+                // See note in clear(): do not free cached pointers here.
+                eprintln!("[ThreadCache::clear_partial] skipping dealloc ptr={:p} size={}", self.entries[i].ptr, self.entries[i].size);
             }
         }
         
@@ -150,6 +143,11 @@ pub fn reset_thread_cache() {
     THREAD_CACHE.with(|cache| {
         cache.borrow_mut().clear();
     });
+}
+
+// Backwards-compatible alias used by tests/examples
+pub fn clear_thread_cache() {
+    reset_thread_cache();
 }
 
 // Per-arena thread-local cache management

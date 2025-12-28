@@ -192,17 +192,24 @@ impl Arena {
         unsafe {
             let inner = &mut *self.inner.get();
             let current_chunk_idx = inner.current_chunk.load(Ordering::Acquire);
-            
-            if let Some(ptr) = inner.chunks[current_chunk_idx].allocate(layout) {
+
+            let chunk_idx = if current_chunk_idx >= inner.chunks.len() {
+                inner.chunks.len().saturating_sub(1)
+            } else {
+                current_chunk_idx
+            };
+
+            if let Some(ptr) = inner.chunks[chunk_idx].allocate(layout) {
                 return ptr;
             }
 
-            let new_capacity = layout.size() * 2;
+            let new_capacity = layout.size().saturating_mul(2).max(crate::MIN_CHUNK_SIZE);
             let mut new_chunk = Chunk::new(new_capacity).expect("Failed to allocate new chunk");
-            
+
             if let Some(ptr) = new_chunk.allocate(layout) {
                 inner.chunks.push(new_chunk);
-                inner.current_chunk.store(inner.chunks.len() - 1, Ordering::Release);
+                let idx = inner.chunks.len().saturating_sub(1);
+                inner.current_chunk.store(idx, Ordering::Release);
                 return ptr;
             } else {
                 panic!("Failed to allocate in new chunk");
@@ -384,19 +391,8 @@ impl ArenaBuilder {
         self.initial_capacity = capacity;
         self
     }
-
-    pub fn chunk_size(mut self, size: usize) -> Self {
-        self.chunk_size = size.max(crate::MIN_CHUNK_SIZE).min(crate::MAX_CHUNK_SIZE);
-        self
-    }
-
     pub fn reserve_size(mut self, size: usize) -> Self {
         self.reserve_size = Some(size);
-        self
-    }
-
-    pub fn max_chunks(mut self, max: usize) -> Self {
-        self.max_chunks = Some(max);
         self
     }
 

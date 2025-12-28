@@ -78,9 +78,9 @@ mod tests {
             .initial_capacity(1024)
             .build();
         
-        // Allocate enough to trigger multiple chunks
+        // Allocate enough to trigger multiple chunks (bigger than lockfree max)
         for _ in 0..10 {
-            let _data = arena.alloc([0u8; 200]);
+            let _data = arena.alloc([0u8; 2000]);
         }
         
         let stats_before = arena.stats();

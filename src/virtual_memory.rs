@@ -51,8 +51,17 @@ impl VirtualMemoryRegion {
             }
         };
 
-        if ptr.is_null() {
-            return Err("Failed to reserve virtual memory");
+        #[cfg(windows)]
+        {
+            if ptr.is_null() {
+                return Err("Failed to reserve virtual memory");
+            }
+        }
+        #[cfg(unix)]
+        {
+            if ptr == libc::MAP_FAILED as *mut _ {
+                return Err("Failed to reserve virtual memory");
+            }
         }
 
         Ok(Self {
@@ -63,9 +72,13 @@ impl VirtualMemoryRegion {
     }
 
     pub fn commit(&mut self, offset: usize, size: usize) -> Result<(), &'static str> {
+        if size == 0 {
+            return Ok(());
+        }
+
         let offset = (offset + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
         let size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
-        let end = offset + size;
+        let end = offset.checked_add(size).ok_or("Commit range overflow")?;
 
         if end > self.reserved_size {
             return Err("Commit size exceeds reserved size");
@@ -124,9 +137,13 @@ impl VirtualMemoryRegion {
     }
 
     pub fn decommit(&mut self, offset: usize, size: usize) -> Result<(), &'static str> {
+        if size == 0 {
+            return Ok(());
+        }
+
         let offset = (offset + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
         let size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
-        let end = offset + size;
+        let end = offset.checked_add(size).ok_or("Decommit range overflow")?;
 
         if end > self.committed_size {
             return Err("Decommit size exceeds committed size");
@@ -159,7 +176,7 @@ impl VirtualMemoryRegion {
                 if result != 0 {
                     return Err("Failed to decommit virtual memory");
                 }
-                
+
                 // Also discard the pages to free physical memory
                 #[cfg(target_os = "macos")]
                 {

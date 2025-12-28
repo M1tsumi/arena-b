@@ -192,10 +192,15 @@ impl Drop for Chunk {
         unsafe {
             if self.capacity > 0 {
                 if let Ok(layout) = Layout::from_size_align(self.capacity, 64) {
+                    eprintln!("[Chunk::drop] dealloc ptr={:p} capacity={}", self.ptr.as_ptr(), self.capacity);
+                    // Print a backtrace to help identify the drop origin when debugging
+                    eprintln!("[Chunk::drop] backtrace:\n{}", std::backtrace::Backtrace::capture());
                     dealloc(self.ptr.as_ptr(), layout);
                 } else {
                     // Fallback: deallocate using a minimal layout
                     let fallback = Layout::from_size_align(64, 64).unwrap();
+                    eprintln!("[Chunk::drop] dealloc ptr={:p} capacity=fallback(64)", self.ptr.as_ptr());
+                    eprintln!("[Chunk::drop] backtrace:\n{}", std::backtrace::Backtrace::capture());
                     dealloc(self.ptr.as_ptr(), fallback);
                 }
             }
@@ -303,7 +308,7 @@ impl ArenaInner {
             #[cfg(feature = "thread_local")]
             thread_cache_active: true,
             #[cfg(feature = "lockfree")]
-            lockfree_buffer: None,
+            lockfree_buffer: Some(crate::lockfree::LockFreeBuffer::new()),
             #[cfg(feature = "lockfree")]
             lockfree_stats: crate::lockfree::LockFreeStats::new(),
         };
@@ -331,10 +336,16 @@ impl ArenaInner {
             }
         }
 
-        // Try current chunk
+        // Try current chunk (use safe clamped index)
         let current_chunk_idx = self.current_chunk.load(Ordering::Acquire);
-        if let Some(chunk) = self.chunks.get(current_chunk_idx) {
-                if let Some(ptr) = chunk.allocate(layout) {
+        let chunk_idx = if current_chunk_idx >= self.chunks.len() {
+            self.chunks.len().saturating_sub(1)
+        } else {
+            current_chunk_idx
+        };
+
+        if let Some(chunk) = self.chunks.get(chunk_idx) {
+            if let Some(ptr) = chunk.allocate(layout) {
                 #[cfg(feature = "stats")]
                 {
                     self.stats.bytes_used.fetch_add(size, Ordering::Relaxed);
@@ -390,6 +401,11 @@ impl ArenaInner {
 
     pub fn checkpoint(&mut self) -> ArenaCheckpoint {
         let current_chunk_idx = self.current_chunk.load(Ordering::Acquire);
+        let current_chunk_idx = if current_chunk_idx >= self.chunks.len() {
+            self.chunks.len().saturating_sub(1)
+        } else {
+            current_chunk_idx
+        };
         let current_chunk = &self.chunks[current_chunk_idx];
         let chunk_offset = current_chunk.used();
         

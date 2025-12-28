@@ -34,10 +34,11 @@ impl DebugGuard {
             checkpoint_id,
         };
         
-        // Write magic pattern to guards
+        // Write magic pattern to guards using byte pattern to avoid large shifts
+        let bytes = GUARD_MAGIC.to_ne_bytes();
         for i in 0..GUARD_SIZE {
-            guard.pre_guard[i] = ((GUARD_MAGIC >> (i * 8)) & 0xFF) as u8;
-            guard.post_guard[i] = ((GUARD_MAGIC >> ((i + GUARD_SIZE) * 8)) & 0xFF) as u8;
+            guard.pre_guard[i] = bytes[i % bytes.len()];
+            guard.post_guard[i] = bytes[i % bytes.len()];
         }
         
         guard
@@ -48,12 +49,12 @@ impl DebugGuard {
             return Err("Magic number corrupted");
         }
 
+        let bytes = GUARD_MAGIC.to_ne_bytes();
         for i in 0..GUARD_SIZE {
-            let expected = ((GUARD_MAGIC >> (i * 8)) & 0xFF) as u8;
+            let expected = bytes[i % bytes.len()];
             if self.pre_guard[i] != expected {
                 return Err("Pre-guard corrupted");
             }
-            let expected = ((GUARD_MAGIC >> ((i + GUARD_SIZE) * 8)) & 0xFF) as u8;
             if self.post_guard[i] != expected {
                 return Err("Post-guard corrupted");
             }
@@ -96,7 +97,7 @@ impl DebugState {
             next_arena_id: AtomicUsize::new(1),
             corrupted_allocations: 0,
             leak_reports: 0,
-            backtraces_enabled: cfg!(feature = "debug_backtrace"),
+            backtraces_enabled: cfg!(feature = "debug"),
         }
     }
 
@@ -127,15 +128,11 @@ impl DebugState {
                         }
                     }
                     
-                    // Validate guard bytes
-                    let guard_ptr = unsafe {
-                        ptr.sub(GUARD_SIZE)
-                    };
-                    let guard = unsafe {
-                        &*(guard_ptr as *const DebugGuard)
-                    };
-                    
-                    return guard.validate();
+                    // Validate guard bytes (use unaligned read to avoid UB)
+                    let guard_ptr = unsafe { ptr.sub(GUARD_SIZE) };
+                    let guard_val = unsafe { core::ptr::read_unaligned(guard_ptr as *const DebugGuard) };
+
+                    return guard_val.validate();
                 }
             }
         }
@@ -171,12 +168,12 @@ impl DebugState {
             return None;
         }
 
-        #[cfg(feature = "debug_backtrace")]
+        #[cfg(feature = "debug")]
         {
             Some(std::backtrace::Backtrace::capture().to_string())
         }
 
-        #[cfg(not(feature = "debug_backtrace"))]
+        #[cfg(not(feature = "debug"))]
         {
             None
         }
@@ -207,10 +204,11 @@ impl DebugState {
         if let Some(allocations) = self.allocations.get_mut(&arena_id) {
             for info in allocations.iter_mut() {
                 if info.checkpoint_id > checkpoint_id {
-                    // Corrupt the guard to detect use-after-rewind
+                    // Corrupt the guard to detect use-after-rewind (write unaligned)
                     unsafe {
-                        let guard_ptr = info.ptr.sub(GUARD_SIZE) as *mut DebugGuard;
-                        (*guard_ptr).magic = 0xDEADBEEFCAFEBABE;
+                        let guard_u8 = info.ptr.sub(GUARD_SIZE) as *mut u8;
+                        // Taint the first guard byte to mark corruption without causing aligned deref
+                        core::ptr::write_unaligned(guard_u8, 0u8);
                     }
                 }
             }
@@ -415,16 +413,7 @@ impl DebugAllocator {
             );
         }
 
-        // Deallocate original pointer
-        unsafe {
-            if size > 0 {
-                if let Ok(original_layout) = Layout::from_size_align(size, 1) {
-                    dealloc(ptr, original_layout);
-                } else if let Ok(fallback) = Layout::from_size_align(1, 1) {
-                    dealloc(ptr, fallback);
-                }
-            }
-        }
+        // Do not deallocate the original pointer here — it may belong to arena chunks.
 
         unsafe {
             debug_ptr.add(core::mem::size_of::<DebugGuard>() + GUARD_SIZE)

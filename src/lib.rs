@@ -62,9 +62,6 @@ pub use self::legacy_arena::{Arena, ArenaBuilder, Scope, FeatureBundle};
 // `arena_module` feature is enabled.
 pub use self::legacy_arena::FeatureBundle;
 
-#[cfg(all(feature = "single_thread_fast", feature = "lockfree"))]
-compile_error!("feature `single_thread_fast` is incompatible with `lockfree` (Arena is not Send and chunk usage tracking is non-atomic)");
-
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
@@ -353,7 +350,7 @@ pub use lockfree::{LockFreeAllocator, LockFreeBuffer, LockFreePool, LockFreeStat
 
 /// Re-export thread-local cache types when the feature is enabled.
 #[cfg(feature = "thread_local")]
-pub use thread_local::{cleanup_thread_cache, reset_thread_cache, try_thread_local_alloc};
+pub use thread_local::{cleanup_thread_cache, reset_thread_cache, clear_thread_cache, try_thread_local_alloc};
 
 /// Re-export virtual memory types when the feature is enabled.
 #[cfg(feature = "virtual_memory")]

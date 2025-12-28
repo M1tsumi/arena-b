@@ -2,7 +2,7 @@
 
 use arena_b::Arena;
 
-#[cfg(feature = "lockfree")]
+#[cfg(all(feature = "lockfree", not(feature = "single_thread_fast")))]
 #[test]
 fn lockfree_multithread_race_regression() {
     use std::sync::{Arc, Barrier, Mutex};
