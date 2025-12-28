@@ -17,17 +17,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install Rust (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        shell: bash
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          source $HOME/.cargo/env
+          source "$HOME/.cargo/env"
           rustup toolchain install "${{ matrix.rust }}"
           rustup component add rustfmt clippy --toolchain "${{ matrix.rust }}"
 
-      - name: Show rustc version and target
+      - name: Install Rust (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -UseBasicParsing https://sh.rustup.rs -OutFile rustup-init.exe
+          ./rustup-init.exe -y
+          echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & "$env:USERPROFILE\.cargo\bin\rustup.exe" toolchain install "${{ matrix.rust }}"
+          & "$env:USERPROFILE\.cargo\bin\rustup.exe" component add rustfmt clippy --toolchain "${{ matrix.rust }}"
+
+      - name: Show rustc version and target (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        shell: bash
         run: |
           rustc -Vv
           rustc --print target-list | grep -E "(x86_64|aarch64)"
+
+      - name: Show rustc version and target (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          rustc -Vv
+          rustc --print target-list
 
       - name: Cargo fmt
         run: cargo fmt --all -- --check
