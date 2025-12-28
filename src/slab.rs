@@ -33,20 +33,58 @@ impl SlabAllocator {
     #[inline]
     pub(crate) unsafe fn dealloc(&mut self, ptr: NonNull<u8>, size: usize) {
         let Some(pool_idx) = Self::get_pool_index(size) else {
-            let layout = Layout::from_size_align(size, 8).unwrap();
-                eprintln!("[slab::dealloc] dealloc ptr={:p} size={}", ptr.as_ptr(), size);
-                eprintln!("[slab::dealloc] backtrace:\n{}", std::backtrace::Backtrace::capture());
+            if let Ok(layout) = Layout::from_size_align(size, 8) {
+                eprintln!(
+                    "[slab::dealloc] dealloc ptr={:p} size={}",
+                    ptr.as_ptr(),
+                    size
+                );
+                eprintln!(
+                    "[slab::dealloc] backtrace:\n{}",
+                    std::backtrace::Backtrace::capture()
+                );
                 std::alloc::dealloc(ptr.as_ptr(), layout);
+            } else {
+                let fallback = Layout::from_size_align(8, 8).expect("fallback layout invalid");
+                eprintln!(
+                    "[slab::dealloc] dealloc ptr={:p} size=fallback(8)",
+                    ptr.as_ptr()
+                );
+                eprintln!(
+                    "[slab::dealloc] backtrace:\n{}",
+                    std::backtrace::Backtrace::capture()
+                );
+                std::alloc::dealloc(ptr.as_ptr(), fallback);
+            }
             return;
         };
 
         if self.pools[pool_idx].len() < 64 {
             self.pools[pool_idx].push(ptr);
         } else {
-            let layout = Layout::from_size_align(size, 8).unwrap();
-                eprintln!("[slab::dealloc] dealloc ptr={:p} size={}", ptr.as_ptr(), size);
-                eprintln!("[slab::dealloc] backtrace:\n{}", std::backtrace::Backtrace::capture());
+            if let Ok(layout) = Layout::from_size_align(size, 8) {
+                eprintln!(
+                    "[slab::dealloc] dealloc ptr={:p} size={}",
+                    ptr.as_ptr(),
+                    size
+                );
+                eprintln!(
+                    "[slab::dealloc] backtrace:\n{}",
+                    std::backtrace::Backtrace::capture()
+                );
                 std::alloc::dealloc(ptr.as_ptr(), layout);
+            } else {
+                let fallback = Layout::from_size_align(8, 8).expect("fallback layout invalid");
+                eprintln!(
+                    "[slab::dealloc] dealloc ptr={:p} size=fallback(8)",
+                    ptr.as_ptr()
+                );
+                eprintln!(
+                    "[slab::dealloc] backtrace:\n{}",
+                    std::backtrace::Backtrace::capture()
+                );
+                std::alloc::dealloc(ptr.as_ptr(), fallback);
+            }
         }
     }
 }

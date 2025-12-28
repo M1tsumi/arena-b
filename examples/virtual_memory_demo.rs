@@ -28,12 +28,15 @@ fn compare_arena_types() {
 
     // Regular arena
     let regular_arena = Arena::new();
-    let regular_data = regular_arena.alloc([0u8; 1_000_000]);
+    // Allocate on the heap first to avoid huge stack allocations
+    let regular_heap = vec![0u8; 1_000_000];
+    let regular_data = regular_arena.alloc(regular_heap);
     println!("  Regular arena: allocated {} bytes", regular_data.len());
 
     // Virtual memory arena
     let vm_arena = Arena::with_virtual_memory(16 * 1024 * 1024); // 16MB reserve
-    let vm_data = vm_arena.alloc([0u8; 1_000_000]);
+    let vm_heap = vec![0u8; 1_000_000];
+    let vm_data = vm_arena.alloc(vm_heap);
     println!("  Virtual arena: allocated {} bytes", vm_data.len());
 
     // Both work the same for normal operations
@@ -87,7 +90,8 @@ fn memory_efficiency_demo() {
 
     // Allocate a large amount of data
     println!("  Allocating 10MB of data...");
-    let large_data = arena.alloc([0u8; 10_000_000]);
+    let large_heap = vec![0u8; 10_000_000];
+    let large_data = arena.alloc(large_heap);
 
     println!("  After large allocation:");
     print_stats(&arena);
@@ -117,7 +121,8 @@ fn memory_efficiency_demo() {
 
     // Reuse after reset
     println!("  Reusing arena after reset...");
-    let new_data = arena.alloc([1u8; 5_000_000]);
+    let new_heap = vec![1u8; 5_000_000];
+    let new_data = arena.alloc(new_heap);
     println!("  New allocation size: {}", new_data.len());
 
     println!("  Final stats:");

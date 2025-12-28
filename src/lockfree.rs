@@ -5,9 +5,10 @@ extern crate alloc;
 use alloc::alloc::{alloc, dealloc, Layout};
 use alloc::sync::Arc;
 use core::cmp;
+use core::mem::MaybeUninit;
 use core::ptr::{self, NonNull};
-use std::cell::Cell;
 use core::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
+use std::cell::Cell;
 
 thread_local! {
     static THREAD_SLAB: Cell<ThreadSlab> = Cell::new(ThreadSlab::new());
@@ -22,7 +23,7 @@ fn align_up(value: usize, align: usize) -> usize {
 }
 
 /// Thread-local slab allocator for reduced contention.
-/// 
+///
 /// Each thread gets its own slab region carved from the lock-free buffer,
 /// enabling zero-contention allocations within that region.
 #[derive(Copy, Clone)]
@@ -149,14 +150,24 @@ impl LockFreeBuffer {
     pub fn new() -> Self {
         #[cfg(feature = "single_thread_fast")]
         {
-            let layout = Layout::from_size_align(LOCKFREE_BUFFER_SIZE, LOCKFREE_ALIGNMENT)
-                .expect("Invalid layout for lock-free buffer");
-            let buffer = unsafe { alloc(layout) };
+            // Track the actual allocated capacity so Drop can deallocate correctly
+            let (buffer_ptr, actual_capacity) = if let Ok(layout) =
+                Layout::from_size_align(LOCKFREE_BUFFER_SIZE, LOCKFREE_ALIGNMENT)
+            {
+                (unsafe { alloc(layout) }, LOCKFREE_BUFFER_SIZE)
+            } else {
+                eprintln!("LockFreeBuffer::new: Layout::from_size_align failed for size={} align={}. Falling back to minimal allocation.", LOCKFREE_BUFFER_SIZE, LOCKFREE_ALIGNMENT);
+                let fallback = Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT).unwrap_or_else(|_| {
+                    eprintln!("LockFreeBuffer::new: fallback layout creation failed, using minimal sized layout");
+                    Layout::from_size_align(8,8).expect("fallback layout invalid")
+                });
+                (unsafe { alloc(fallback) }, LOCKFREE_ALIGNMENT)
+            };
 
             Self {
-                buffer: Cell::new(buffer),
+                buffer: Cell::new(buffer_ptr),
                 offset: Cell::new(0),
-                capacity: LOCKFREE_BUFFER_SIZE,
+                capacity: actual_capacity,
                 stats: Arc::new(LockFreeStats::new()),
                 generation: Cell::new(0),
             }
@@ -164,14 +175,23 @@ impl LockFreeBuffer {
 
         #[cfg(not(feature = "single_thread_fast"))]
         {
-            let layout = Layout::from_size_align(LOCKFREE_BUFFER_SIZE, LOCKFREE_ALIGNMENT)
-                .expect("Invalid layout for lock-free buffer");
-            let buffer = unsafe { alloc(layout) };
+            let (buffer_ptr, actual_capacity) = if let Ok(layout) =
+                Layout::from_size_align(LOCKFREE_BUFFER_SIZE, LOCKFREE_ALIGNMENT)
+            {
+                (unsafe { alloc(layout) }, LOCKFREE_BUFFER_SIZE)
+            } else {
+                eprintln!("LockFreeBuffer::new: Layout::from_size_align failed for size={} align={}. Falling back to minimal allocation.", LOCKFREE_BUFFER_SIZE, LOCKFREE_ALIGNMENT);
+                let fallback = Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT).unwrap_or_else(|_| {
+                    eprintln!("LockFreeBuffer::new: fallback layout creation failed, using minimal sized layout");
+                    Layout::from_size_align(8,8).expect("fallback layout invalid")
+                });
+                (unsafe { alloc(fallback) }, LOCKFREE_ALIGNMENT)
+            };
 
             Self {
-                buffer: AtomicPtr::new(buffer),
+                buffer: AtomicPtr::new(buffer_ptr),
                 offset: AtomicUsize::new(0),
-                capacity: LOCKFREE_BUFFER_SIZE,
+                capacity: actual_capacity,
                 stats: Arc::new(LockFreeStats::new()),
                 generation: AtomicUsize::new(0),
             }
@@ -305,13 +325,28 @@ impl Drop for LockFreeBuffer {
             unsafe {
                 if self.capacity > 0 {
                     if let Ok(layout) = Layout::from_size_align(self.capacity, LOCKFREE_ALIGNMENT) {
-                        eprintln!("[LockFreeBuffer::drop] dealloc ptr={:p} capacity={}", buffer_ptr, self.capacity);
-                        eprintln!("[LockFreeBuffer::drop] backtrace:\n{}", std::backtrace::Backtrace::capture());
+                        eprintln!(
+                            "[LockFreeBuffer::drop] dealloc ptr={:p} capacity={}",
+                            buffer_ptr, self.capacity
+                        );
+                        eprintln!(
+                            "[LockFreeBuffer::drop] backtrace:\n{}",
+                            std::backtrace::Backtrace::capture()
+                        );
                         dealloc(buffer_ptr, layout);
                     } else {
-                        let fallback = Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT).unwrap();
-                        eprintln!("[LockFreeBuffer::drop] dealloc ptr={:p} capacity=fallback({})", buffer_ptr, LOCKFREE_ALIGNMENT);
-                        eprintln!("[LockFreeBuffer::drop] backtrace:\n{}", std::backtrace::Backtrace::capture());
+                        let fallback = Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT).unwrap_or_else(|_| {
+                            eprintln!("[LockFreeBuffer::drop] Layout::from_size_align(fallback) failed, using minimal layout");
+                            Layout::from_size_align(8, 8).expect("fallback layout invalid")
+                        });
+                        eprintln!(
+                            "[LockFreeBuffer::drop] dealloc ptr={:p} capacity=fallback({})",
+                            buffer_ptr, LOCKFREE_ALIGNMENT
+                        );
+                        eprintln!(
+                            "[LockFreeBuffer::drop] backtrace:\n{}",
+                            std::backtrace::Backtrace::capture()
+                        );
                         dealloc(buffer_ptr, fallback);
                     }
                 }
@@ -495,7 +530,7 @@ struct LockFreePoolInner<T> {
 
 #[repr(C)]
 struct LockFreeNode<T> {
-    data: T,
+    data: MaybeUninit<T>,
     next: AtomicPtr<LockFreeNode<T>>,
 }
 
@@ -535,14 +570,12 @@ impl<T> LockFreePool<T> {
                 Ok(_) => {
                     self.pool.stats.record_allocation();
                     self.pool.stats.record_cache_hit();
-                    
-                    // Extract the data and deallocate the node
-                    let data = unsafe { std::ptr::read(&node.data) };
+
+                    // Extract the data and free the node memory safely via Box
+                    let data = unsafe { std::ptr::read(node.data.as_ptr()) };
                     unsafe {
-                        let layout = Layout::new::<LockFreeNode<T>>();
-                        eprintln!("[LockFree] dealloc ptr={:p} size={}", head as *mut u8, layout.size());
-                        eprintln!("[LockFree] backtrace:\n{}", std::backtrace::Backtrace::capture());
-                        dealloc(head as *mut u8, layout);
+                        // Convert the raw pointer back to a Box to free memory
+                        let _boxed: Box<LockFreeNode<T>> = Box::from_raw(head);
                     }
                     return Some(data);
                 }
@@ -555,19 +588,19 @@ impl<T> LockFreePool<T> {
     }
 
     pub fn dealloc(&self, data: T) {
-        let layout = Layout::new::<LockFreeNode<T>>();
-        let node_ptr = unsafe { alloc(layout) as *mut LockFreeNode<T> };
-        if node_ptr.is_null() {
-            return;
-        }
-
-        let node = unsafe { &mut *node_ptr };
-        node.data = data;
-        node.next.store(core::ptr::null_mut(), Ordering::Relaxed);
+        // Allocate a new node using Box to ensure correct construction and
+        // destructor behavior for `T`.
+        let boxed = Box::new(LockFreeNode {
+            data: MaybeUninit::new(data),
+            next: AtomicPtr::new(core::ptr::null_mut()),
+        });
+        let node_ptr = Box::into_raw(boxed);
 
         loop {
             let head = self.pool.head.load(Ordering::Acquire);
-            node.next.store(head, Ordering::Relaxed);
+            unsafe {
+                (*node_ptr).next.store(head, Ordering::Relaxed);
+            }
 
             match self.pool.head.compare_exchange_weak(
                 head,
@@ -605,15 +638,21 @@ impl<T> Drop for LockFreePoolInner<T> {
         while !head.is_null() {
             let node = unsafe { &*head };
             let next = node.next.load(Ordering::Acquire);
-            
             unsafe {
-                let layout = Layout::new::<LockFreeNode<T>>();
-                eprintln!("[LockFreePoolInner::drop] dealloc node={:p}", head);
-                eprintln!("[LockFree::dealloc] dealloc ptr={:p} size={}", head as *mut u8, layout.size());
-                eprintln!("[LockFreePoolInner::drop] backtrace:\n{}", std::backtrace::Backtrace::capture());
-                dealloc(head as *mut u8, layout);
+                // Reconstruct the Box to free memory and drop the stored value.
+                let boxed: Box<LockFreeNode<T>> = Box::from_raw(head);
+                // SAFETY: `data` was stored as `MaybeUninit<T>`; we must drop it
+                // properly if it's initialized. Attempt to read and drop it.
+                let data_ptr = boxed.data.as_ptr();
+                let _ = std::ptr::read(data_ptr);
+                eprintln!("[LockFreePoolInner::drop] freed node={:p}", head);
+                eprintln!(
+                    "[LockFreePoolInner::drop] backtrace:\n{}",
+                    std::backtrace::Backtrace::capture()
+                );
+                // `boxed` destructor will free the node memory (data already moved out)
             }
-            
+
             head = next;
         }
     }

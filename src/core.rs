@@ -3,6 +3,7 @@
 extern crate alloc;
 
 use alloc::alloc::{alloc, dealloc, Layout};
+use alloc::vec::Vec;
 use core::cell::UnsafeCell;
 use core::marker::PhantomData;
 use core::mem::{self, MaybeUninit};
@@ -10,7 +11,6 @@ use core::ptr::{self, NonNull};
 use core::slice;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::usize;
-use alloc::vec::Vec;
 use std::sync::Mutex;
 
 #[cfg(target_arch = "x86_64")]
@@ -61,7 +61,11 @@ pub struct AtomicCounter {
 
 impl std::fmt::Debug for AtomicCounter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "AtomicCounter({})", self.value.load(std::sync::atomic::Ordering::Relaxed))
+        write!(
+            f,
+            "AtomicCounter({})",
+            self.value.load(std::sync::atomic::Ordering::Relaxed)
+        )
     }
 }
 
@@ -124,10 +128,12 @@ impl Chunk {
         }
         // Round up to next multiple of 64 for alignment
         let capacity = (capacity + 63) & !63;
-        eprintln!("Attempting allocation: requested_capacity={} aligned_capacity={} alignment=64", capacity, capacity);
-        let layout = Layout::from_size_align(capacity, 64)
-            .map_err(|_| "Invalid layout")?;
-        
+        eprintln!(
+            "Attempting allocation: requested_capacity={} aligned_capacity={} alignment=64",
+            capacity, capacity
+        );
+        let layout = Layout::from_size_align(capacity, 64).map_err(|_| "Invalid layout")?;
+
         let ptr = unsafe { alloc(layout) };
         if ptr.is_null() {
             return Err("Failed to allocate memory");
@@ -143,7 +149,7 @@ impl Chunk {
     pub fn allocate(&self, layout: Layout) -> Option<*mut u8> {
         let size = layout.size();
         let align = layout.align();
-        
+
         let current_used = self.used.load(Ordering::Acquire);
         let start = (current_used + align - 1) & !(align - 1);
         let end = start + size;
@@ -152,12 +158,11 @@ impl Chunk {
             return None;
         }
 
-        if self.used.compare_exchange_weak(
-            current_used,
-            end,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        ).is_ok() {
+        if self
+            .used
+            .compare_exchange_weak(current_used, end, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
             unsafe {
                 let ptr = self.ptr.as_ptr().add(start);
                 // Prefetch the allocated memory
@@ -198,15 +203,31 @@ impl Drop for Chunk {
         unsafe {
             if self.capacity > 0 {
                 if let Ok(layout) = Layout::from_size_align(self.capacity, 64) {
-                    eprintln!("[Chunk::drop] dealloc ptr={:p} capacity={}", self.ptr.as_ptr(), self.capacity);
+                    eprintln!(
+                        "[Chunk::drop] dealloc ptr={:p} capacity={}",
+                        self.ptr.as_ptr(),
+                        self.capacity
+                    );
                     // Print a backtrace to help identify the drop origin when debugging
-                    eprintln!("[Chunk::drop] backtrace:\n{}", std::backtrace::Backtrace::capture());
+                    eprintln!(
+                        "[Chunk::drop] backtrace:\n{}",
+                        std::backtrace::Backtrace::capture()
+                    );
                     dealloc(self.ptr.as_ptr(), layout);
                 } else {
                     // Fallback: deallocate using a minimal layout
-                    let fallback = Layout::from_size_align(64, 64).unwrap();
-                    eprintln!("[Chunk::drop] dealloc ptr={:p} capacity=fallback(64)", self.ptr.as_ptr());
-                    eprintln!("[Chunk::drop] backtrace:\n{}", std::backtrace::Backtrace::capture());
+                    let fallback = Layout::from_size_align(64, 64).unwrap_or_else(|_| {
+                        eprintln!("[Chunk::drop] Layout::from_size_align(fallback) failed, using minimal layout");
+                        Layout::from_size_align(8, 8).expect("fallback layout invalid")
+                    });
+                    eprintln!(
+                        "[Chunk::drop] dealloc ptr={:p} capacity=fallback(64)",
+                        self.ptr.as_ptr()
+                    );
+                    eprintln!(
+                        "[Chunk::drop] backtrace:\n{}",
+                        std::backtrace::Backtrace::capture()
+                    );
                     dealloc(self.ptr.as_ptr(), fallback);
                 }
             }
@@ -261,13 +282,18 @@ impl ArenaStats {
             chunk_count: 0,
         }
     }
-
     pub fn bytes_used(&self) -> usize {
         self.bytes_used.load(Ordering::Acquire)
     }
 
     pub fn allocation_count(&self) -> usize {
         self.allocation_count.load(Ordering::Acquire)
+    }
+}
+
+impl Default for ArenaStats {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -293,7 +319,7 @@ pub struct ArenaInner {
 impl ArenaInner {
     pub fn new(initial_capacity: usize) -> Result<Self, &'static str> {
         let chunk = Chunk::new(initial_capacity)?;
-        
+
         let mut pools = Vec::new();
         let mut size = 8;
         while size <= 4096 {
@@ -321,7 +347,10 @@ impl ArenaInner {
 
         #[cfg(feature = "stats")]
         {
-            inner.stats.bytes_allocated.store(initial_capacity, Ordering::Relaxed);
+            inner
+                .stats
+                .bytes_allocated
+                .store(initial_capacity, Ordering::Relaxed);
             inner.stats.chunk_count = inner.chunks.len();
         }
 
@@ -330,13 +359,16 @@ impl ArenaInner {
 
     pub fn allocate(&mut self, layout: Layout) -> Option<*mut u8> {
         let size = layout.size();
-        
+
         // Try memory pool for small allocations
         if size <= 4096 {
             if let Some(_pool) = self.pools.iter().find(|p| p.size_class() >= size) {
-                if let Some(ptr) = self.pools.iter_mut()
+                if let Some(ptr) = self
+                    .pools
+                    .iter_mut()
                     .find(|p| p.size_class() >= size)
-                    .and_then(|p| p.alloc()) {
+                    .and_then(|p| p.alloc())
+                {
                     return Some(ptr.as_ptr());
                 }
             }
@@ -373,7 +405,9 @@ impl ArenaInner {
         #[cfg(feature = "stats")]
         {
             self.stats.chunk_count = self.chunks.len();
-            self.stats.bytes_allocated.fetch_add(capacity, Ordering::Relaxed);
+            self.stats
+                .bytes_allocated
+                .fetch_add(capacity, Ordering::Relaxed);
         }
         Ok(chunk_index)
     }
@@ -385,18 +419,18 @@ impl ArenaInner {
         self.current_chunk.store(0, Ordering::Release);
         self.checkpoints.clear();
         self.current_checkpoint_id = 0;
-        
+
         #[cfg(feature = "stats")]
         {
             self.stats.bytes_used.store(0, Ordering::Release);
             self.stats.allocation_count.store(0, Ordering::Release);
         }
-        
+
         #[cfg(feature = "thread_local")]
         {
             crate::thread_local::reset_thread_cache();
         }
-        
+
         #[cfg(feature = "lockfree")]
         {
             if let Some(ref buffer) = self.lockfree_buffer {
@@ -414,10 +448,12 @@ impl ArenaInner {
         };
         let current_chunk = &self.chunks[current_chunk_idx];
         let chunk_offset = current_chunk.used();
-        
+
         let alloc_count = if cfg!(feature = "stats") {
             self.stats.allocation_count.load(Ordering::Acquire)
-        } else { 0 };
+        } else {
+            0
+        };
 
         let checkpoint = ArenaCheckpoint {
             chunk_index: current_chunk_idx,
@@ -425,22 +461,27 @@ impl ArenaInner {
             checkpoint_id: self.current_checkpoint_id,
             allocation_count: alloc_count,
         };
-        
+
         self.checkpoints.push(checkpoint);
         self.current_checkpoint_id += 1;
-        
+
         checkpoint
     }
 
     pub fn rewind_to_checkpoint(&mut self, checkpoint: ArenaCheckpoint) {
         // Validate checkpoint
-        assert!(checkpoint.chunk_index < self.chunks.len(), 
-                "Invalid checkpoint: chunk index out of bounds");
-        assert!(checkpoint.chunk_offset <= self.chunks[checkpoint.chunk_index].capacity(),
-                "Invalid checkpoint: offset exceeds chunk capacity");
-        
+        assert!(
+            checkpoint.chunk_index < self.chunks.len(),
+            "Invalid checkpoint: chunk index out of bounds"
+        );
+        assert!(
+            checkpoint.chunk_offset <= self.chunks[checkpoint.chunk_index].capacity(),
+            "Invalid checkpoint: offset exceeds chunk capacity"
+        );
+
         // Reset current chunk and all subsequent chunks
-        self.current_chunk.store(checkpoint.chunk_index, Ordering::Release);
+        self.current_chunk
+            .store(checkpoint.chunk_index, Ordering::Release);
         for (idx, chunk) in self.chunks.iter_mut().enumerate() {
             if idx < checkpoint.chunk_index {
                 continue;
@@ -454,11 +495,12 @@ impl ArenaInner {
                 chunk.reset();
             }
         }
-        
+
         // Remove checkpoints after this one
         self.checkpoints.retain(|cp| {
-            cp.chunk_index < checkpoint.chunk_index ||
-            (cp.chunk_index == checkpoint.chunk_index && cp.chunk_offset <= checkpoint.chunk_offset)
+            cp.chunk_index < checkpoint.chunk_index
+                || (cp.chunk_index == checkpoint.chunk_index
+                    && cp.chunk_offset <= checkpoint.chunk_offset)
         });
 
         // Update debug tracking
@@ -467,13 +509,13 @@ impl ArenaInner {
             crate::debug::rewind_to_checkpoint(checkpoint.checkpoint_id);
             self.current_checkpoint_id = checkpoint.checkpoint_id + 1;
         }
-        
+
         // Reset thread-local cache
         #[cfg(feature = "thread_local")]
         {
             crate::thread_local::reset_thread_cache();
         }
-        
+
         // Reset lock-free buffer
         #[cfg(feature = "lockfree")]
         {
@@ -481,7 +523,7 @@ impl ArenaInner {
                 buffer.reset();
             }
         }
-        
+
         #[cfg(feature = "stats")]
         {
             let mut bytes_used = 0;
@@ -490,7 +532,9 @@ impl ArenaInner {
             }
             self.stats.bytes_used.store(bytes_used, Ordering::Release);
             // bytes_allocated tracks total allocated chunk capacity; keep it unchanged here
-            self.stats.allocation_count.store(checkpoint.allocation_count, Ordering::Release);
+            self.stats
+                .allocation_count
+                .store(checkpoint.allocation_count, Ordering::Release);
         }
     }
 

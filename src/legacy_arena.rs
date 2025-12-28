@@ -29,23 +29,23 @@ pub struct ArenaBuilder {
     chunk_size: usize,
     reserve_size: Option<usize>,
     max_chunks: Option<usize>,
-    
+
     // Performance tuning
     fast_path_threshold: usize,
     prefetch_distance: usize,
-    
+
     // Feature configuration
     enable_stats: bool,
     enable_debug: bool,
     enable_lockfree: bool,
     enable_thread_local: bool,
     enable_virtual_memory: bool,
-    
+
     // Feature bundle
     feature_bundle: Option<FeatureBundle>,
-    
+
     // Diagnostics
-    diagnostics_sink: Option<Box<dyn Fn(&str) + Send + Sync>>,
+    diagnostics_sink: Option<crate::DiagnosticsSink>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -124,7 +124,7 @@ impl Arena {
     }
 
     pub fn build_config(&self) -> ArenaConfig {
-        // Return default config for now - in a real implementation, 
+        // Return default config for now - in a real implementation,
         // this would store the builder configuration
         ArenaConfig {
             initial_capacity: Self::DEFAULT_CAPACITY,
@@ -150,6 +150,7 @@ impl Arena {
         }
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc<T>(&self, value: T) -> &mut T {
         let layout = Layout::new::<T>();
         let ptr = self.alloc_layout(layout);
@@ -166,8 +167,20 @@ impl Arena {
         self.alloc(T::default())
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc_slice_copy<T: Copy>(&self, slice: &[T]) -> &mut [T] {
-        let layout = Layout::array::<T>(slice.len()).unwrap();
+        let layout = match Layout::array::<T>(slice.len()) {
+            Ok(l) => l,
+            Err(_) => {
+                eprintln!(
+                    "legacy Arena::alloc_slice_copy: invalid layout for len={}",
+                    slice.len()
+                );
+                return unsafe {
+                    core::slice::from_raw_parts_mut(core::ptr::NonNull::<T>::dangling().as_ptr(), 0)
+                };
+            }
+        };
         let ptr = self.alloc_layout(layout) as *mut T;
         unsafe {
             ptr.copy_from_nonoverlapping(slice.as_ptr(), slice.len());
@@ -175,12 +188,25 @@ impl Arena {
         }
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn alloc_slice_uninit<T>(&self, len: usize) -> &mut [core::mem::MaybeUninit<T>] {
-        let layout = Layout::array::<core::mem::MaybeUninit<T>>(len).unwrap();
+        let layout = match Layout::array::<core::mem::MaybeUninit<T>>(len) {
+            Ok(l) => l,
+            Err(_) => {
+                eprintln!(
+                    "legacy Arena::alloc_slice_uninit: invalid layout for len={}",
+                    len
+                );
+                return unsafe {
+                    core::slice::from_raw_parts_mut(
+                        core::ptr::NonNull::<core::mem::MaybeUninit<T>>::dangling().as_ptr(),
+                        0,
+                    )
+                };
+            }
+        };
         let ptr = self.alloc_layout(layout) as *mut core::mem::MaybeUninit<T>;
-        unsafe {
-            core::slice::from_raw_parts_mut(ptr, len)
-        }
+        unsafe { core::slice::from_raw_parts_mut(ptr, len) }
     }
 
     pub fn alloc_str(&self, s: &str) -> &str {
@@ -222,7 +248,7 @@ impl Arena {
             let inner = &mut *self.inner.get();
             let current_chunk_idx = inner.current_chunk.load(Ordering::Acquire);
             let current_chunk = &inner.chunks[current_chunk_idx];
-            
+
             ArenaCheckpoint {
                 chunk_index: current_chunk_idx,
                 chunk_offset: current_chunk.used(),
@@ -252,14 +278,16 @@ impl Arena {
 
     pub unsafe fn rewind_to_checkpoint(&self, checkpoint: ArenaCheckpoint) {
         let inner = &mut *self.inner.get();
-        
+
         for chunk in inner.chunks.iter_mut().skip(checkpoint.chunk_index + 1) {
             chunk.reset();
         }
-        
+
         // Reset the checkpoint chunk to the specific offset
         inner.chunks[checkpoint.chunk_index].set_used(checkpoint.chunk_offset);
-        inner.current_chunk.store(checkpoint.chunk_index, Ordering::Release);
+        inner
+            .current_chunk
+            .store(checkpoint.chunk_index, Ordering::Release);
     }
 
     pub fn scope<'scope, F, R>(&'scope self, f: F) -> R
@@ -277,7 +305,8 @@ impl Arena {
             self.rewind_to_checkpoint(checkpoint);
         }
         // Restore allocation counter to what it was before the scope
-        self.allocation_counter.store(allocation_count_before, Ordering::Relaxed);
+        self.allocation_counter
+            .store(allocation_count_before, Ordering::Relaxed);
         result
     }
 
@@ -287,14 +316,14 @@ impl Arena {
             let chunk_count = inner.chunks.len();
             let mut bytes_allocated = 0;
             let mut bytes_used = 0;
-            
+
             for chunk in &inner.chunks {
                 bytes_allocated += chunk.capacity();
                 bytes_used += chunk.used();
             }
-            
+
             let allocation_count = self.allocation_counter.load(Ordering::Relaxed);
-            
+
             ArenaStats {
                 bytes_allocated,
                 bytes_used,
@@ -335,12 +364,12 @@ impl Arena {
     pub fn reset_and_shrink_to_fit(&self) {
         unsafe {
             let inner = &mut *self.inner.get();
-            
+
             // Reset all chunks
             for chunk in &mut inner.chunks {
                 chunk.reset();
             }
-            
+
             // Keep only the first chunk
             if inner.chunks.len() > 1 {
                 let chunks_to_remove = inner.chunks.drain(1..);
@@ -349,7 +378,7 @@ impl Arena {
                     drop(chunk);
                 }
             }
-            
+
             inner.current_chunk.store(0, Ordering::Release);
             inner.checkpoints.clear();
         }
@@ -457,8 +486,10 @@ impl ArenaBuilder {
     }
 
     // Diagnostics
-    pub fn diagnostics_sink<F>(mut self, sink: F) -> Self 
-    where F: Fn(&str) + Send + Sync + 'static {
+    pub fn diagnostics_sink<F>(mut self, sink: F) -> Self
+    where
+        F: Fn(&str) + Send + Sync + 'static,
+    {
         self.diagnostics_sink = Some(Box::new(sink));
         self
     }
@@ -473,8 +504,10 @@ impl ArenaBuilder {
 
         // Log configuration if diagnostics sink is provided
         if let Some(ref sink) = self.diagnostics_sink {
-            sink(&format!("Building arena with capacity: {}, chunk_size: {}", 
-                         capacity, self.chunk_size));
+            sink(&format!(
+                "Building arena with capacity: {}, chunk_size: {}",
+                capacity, self.chunk_size
+            ));
         }
 
         Arena::with_capacity(capacity)

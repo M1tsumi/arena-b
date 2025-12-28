@@ -8,6 +8,11 @@ use core::ptr;
 #[cfg(windows)]
 use core::ffi::OsStrExt;
 
+#[cfg(unix)]
+fn get_errno() -> i32 {
+    unsafe { *libc::__errno_location() }
+}
+
 const PAGE_SIZE: usize = 4096;
 const DEFAULT_RESERVE_SIZE: usize = 16 * 1024 * 1024; // 16MB
 const DEFAULT_COMMIT_SIZE: usize = 64 * 1024; // 64KB
@@ -32,7 +37,7 @@ impl VirtualMemoryRegion {
             #[cfg(windows)]
             {
                 use windows_sys::Win32::System::Memory::{
-                    VirtualAlloc, MEM_RESERVE, MEM_TOP_DOWN, PAGE_READWRITE
+                    VirtualAlloc, MEM_RESERVE, MEM_TOP_DOWN, PAGE_READWRITE,
                 };
                 VirtualAlloc(
                     ptr::null_mut(),
@@ -57,12 +62,19 @@ impl VirtualMemoryRegion {
         #[cfg(windows)]
         {
             if ptr.is_null() {
+                let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+                eprintln!("VirtualMemoryRegion::new: VirtualAlloc failed, reserve_size={} GetLastError={}", reserve_size, err);
                 return Err("Failed to reserve virtual memory");
             }
         }
         #[cfg(unix)]
         {
             if ptr == libc::MAP_FAILED as *mut _ {
+                let errno = get_errno();
+                eprintln!(
+                    "VirtualMemoryRegion::new: mmap failed, reserve_size={} errno={}",
+                    reserve_size, errno
+                );
                 return Err("Failed to reserve virtual memory");
             }
         }
@@ -87,22 +99,15 @@ impl VirtualMemoryRegion {
             return Err("Commit size exceeds reserved size");
         }
 
-        let commit_ptr = unsafe {
-            self.ptr.add(offset)
-        };
+        let commit_ptr = unsafe { self.ptr.add(offset) };
 
         unsafe {
             #[cfg(windows)]
             {
                 use windows_sys::Win32::System::Memory::{
-                    VirtualAlloc, GetLastError, MEM_COMMIT, PAGE_READWRITE
+                    GetLastError, VirtualAlloc, MEM_COMMIT, PAGE_READWRITE,
                 };
-                let result = VirtualAlloc(
-                    commit_ptr as *mut _,
-                    size,
-                    MEM_COMMIT,
-                    PAGE_READWRITE,
-                );
+                let result = VirtualAlloc(commit_ptr as *mut _, size, MEM_COMMIT, PAGE_READWRITE);
                 if result.is_null() {
                     let err = unsafe { GetLastError() };
                     return Err(match err {
@@ -121,6 +126,11 @@ impl VirtualMemoryRegion {
                     libc::PROT_READ | libc::PROT_WRITE,
                 );
                 if result != 0 {
+                    let errno = get_errno();
+                    eprintln!(
+                        "mprotect commit failed: ptr={:?} size={} errno={}",
+                        commit_ptr, size, errno
+                    );
                     return Err("Failed to commit virtual memory");
                 }
 
@@ -161,41 +171,43 @@ impl VirtualMemoryRegion {
             return Err("Size must be a multiple of page size");
         }
 
-        let decommit_ptr = unsafe {
-            self.ptr.add(offset)
-        };
+        let decommit_ptr = unsafe { self.ptr.add(offset) };
 
         if decommit_ptr.is_null() {
             return Err("Invalid pointer for decommit");
         }
 
-        eprintln!("Decommitting virtual memory: offset={}, size={}, end={}, committed_size={}", offset, size, end, self.committed_size);
+        eprintln!(
+            "Decommitting virtual memory: offset={}, size={}, end={}, committed_size={}",
+            offset, size, end, self.committed_size
+        );
 
         unsafe {
             #[cfg(windows)]
             {
                 use windows_sys::Win32::System::Memory::{VirtualFree, MEM_DECOMMIT};
                 eprintln!("Decommitting: ptr={:?} size={}", decommit_ptr, size);
-                let result = VirtualFree(
-                    decommit_ptr as *mut _,
-                    size,
-                    MEM_DECOMMIT,
-                );
+                let result = VirtualFree(decommit_ptr as *mut _, size, MEM_DECOMMIT);
                 if result == 0 {
-                    eprintln!("VirtualFree failed: ptr={:?} size={}", decommit_ptr, size);
+                    let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+                    eprintln!(
+                        "VirtualFree failed: ptr={:?} size={} GetLastError={}",
+                        decommit_ptr, size, err
+                    );
                     return Err("Failed to decommit virtual memory");
                 }
             }
             #[cfg(unix)]
             {
                 eprintln!("Decommitting: ptr={:?} size={}", decommit_ptr, size);
-                let result = libc::mprotect(
-                    decommit_ptr as *mut libc::c_void,
-                    size,
-                    libc::PROT_NONE,
-                );
+                let result =
+                    libc::mprotect(decommit_ptr as *mut libc::c_void, size, libc::PROT_NONE);
                 if result != 0 {
-                    eprintln!("mprotect failed: ptr={:?} size={} errno={}", decommit_ptr, size, *libc::__errno_location());
+                    let errno = get_errno();
+                    eprintln!(
+                        "mprotect failed: ptr={:?} size={} errno={}",
+                        decommit_ptr, size, errno
+                    );
                     return Err("Failed to decommit virtual memory");
                 }
 
@@ -237,16 +249,23 @@ impl Drop for VirtualMemoryRegion {
             unsafe {
                 #[cfg(windows)]
                 {
-                    use windows_sys::Win32::System::Memory::VirtualFree;
-                    VirtualFree(
-                        self.ptr as *mut _,
-                        0,
-                        windows_sys::Win32::System::Memory::MEM_RELEASE,
-                    );
+                    use windows_sys::Win32::System::Memory::{VirtualFree, MEM_RELEASE};
+                    let res = VirtualFree(self.ptr as *mut _, 0, MEM_RELEASE);
+                    if res == 0 {
+                        let err = windows_sys::Win32::Foundation::GetLastError();
+                        eprintln!("VirtualMemoryRegion::drop: VirtualFree(MEM_RELEASE) failed ptr={:?} GetLastError={}", self.ptr, err);
+                    }
                 }
                 #[cfg(unix)]
                 {
-                    libc::munmap(self.ptr as *mut libc::c_void, self.reserved_size);
+                    let res = libc::munmap(self.ptr as *mut libc::c_void, self.reserved_size);
+                    if res != 0 {
+                        let errno = get_errno();
+                        eprintln!(
+                            "VirtualMemoryRegion::drop: munmap failed ptr={:?} size={} errno={}",
+                            self.ptr, self.reserved_size, errno
+                        );
+                    }
                 }
             }
         }
@@ -263,7 +282,7 @@ pub struct VirtualChunk {
 impl VirtualChunk {
     pub fn new(capacity: usize) -> Result<Self, &'static str> {
         let mut region = VirtualMemoryRegion::new(capacity)?;
-        
+
         // Commit initial chunk
         let initial_commit = capacity.min(DEFAULT_COMMIT_SIZE);
         region.commit(0, initial_commit)?;
@@ -278,7 +297,7 @@ impl VirtualChunk {
     pub unsafe fn allocate(&self, layout: alloc::alloc::Layout) -> Option<*mut u8> {
         let size = layout.size();
         let align = layout.align();
-        
+
         let current_used = self.used.load(core::sync::atomic::Ordering::Acquire);
         let start = (current_used + align - 1) & !(align - 1);
         let end = start + size;
@@ -291,17 +310,22 @@ impl VirtualChunk {
         if end > self.region.committed_size {
             let additional_size = end - self.region.committed_size;
             if let Err(_) = (*(&self.region as *const _ as *mut VirtualMemoryRegion))
-                .commit(self.region.committed_size, additional_size) {
+                .commit(self.region.committed_size, additional_size)
+            {
                 return None;
             }
         }
 
-        if self.used.compare_exchange_weak(
-            current_used,
-            end,
-            core::sync::atomic::Ordering::AcqRel,
-            core::sync::atomic::Ordering::Acquire,
-        ).is_ok() {
+        if self
+            .used
+            .compare_exchange_weak(
+                current_used,
+                end,
+                core::sync::atomic::Ordering::AcqRel,
+                core::sync::atomic::Ordering::Acquire,
+            )
+            .is_ok()
+        {
             let ptr = self.region.ptr.add(start);
             return Some(ptr);
         }
