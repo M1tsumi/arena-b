@@ -370,7 +370,12 @@ impl DebugAllocator {
     /// `ptr` must be a valid, non-null pointer to `size` bytes of initialized data
     /// allocated by the arena. The caller must ensure `size` is correct and that
     /// the memory is valid for reads and writes during guard wrapping.
-    pub unsafe fn allocate_with_guard(&self, ptr: *mut u8, size: usize, checkpoint_id: usize) -> *mut u8 {
+    pub unsafe fn allocate_with_guard(
+        &self,
+        ptr: *mut u8,
+        size: usize,
+        checkpoint_id: usize,
+    ) -> *mut u8 {
         if !self.enabled {
             return ptr;
         }

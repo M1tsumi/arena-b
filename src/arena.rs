@@ -481,11 +481,8 @@ impl Arena {
                             let arena_id = self.debug_allocator.arena_id();
                             // Wrap the raw arena pointer with a debug guard allocation
                             let guarded = unsafe {
-                                self.debug_allocator.allocate_with_guard(
-                                    ptr,
-                                    size,
-                                    inner.current_checkpoint_id,
-                                )
+                                self.debug_allocator
+                                    .allocate_with_guard(ptr, size, inner.current_checkpoint_id)
                             };
                             #[cfg(feature = "stats")]
                             {
@@ -534,11 +531,8 @@ impl Arena {
                     {
                         let inner = unsafe { &*self.inner.get() };
                         let guarded = unsafe {
-                            self.debug_allocator.allocate_with_guard(
-                                ptr,
-                                size,
-                                inner.current_checkpoint_id,
-                            )
+                            self.debug_allocator
+                                .allocate_with_guard(ptr, size, inner.current_checkpoint_id)
                         };
                         #[cfg(feature = "stats")]
                         {
@@ -574,11 +568,8 @@ impl Arena {
             {
                 let arena_id = self.debug_allocator.arena_id();
                 let guarded = unsafe {
-                    self.debug_allocator.allocate_with_guard(
-                        ptr,
-                        size,
-                        inner.current_checkpoint_id,
-                    )
+                    self.debug_allocator
+                        .allocate_with_guard(ptr, size, inner.current_checkpoint_id)
                 };
                 crate::debug::register_allocation(
                     arena_id,
@@ -610,11 +601,8 @@ impl Arena {
                     #[cfg(feature = "debug")]
                     {
                         let guarded = unsafe {
-                            self.debug_allocator.allocate_with_guard(
-                                ptr,
-                                size,
-                                inner.current_checkpoint_id,
-                            )
+                            self.debug_allocator
+                                .allocate_with_guard(ptr, size, inner.current_checkpoint_id)
                         };
                         guarded
                     }
