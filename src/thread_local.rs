@@ -1,6 +1,9 @@
 //! Thread-local caching for reduced contention
 
-use alloc::collections::HashMap;
+extern crate alloc;
+
+use alloc::alloc::{alloc, dealloc, Layout};
+use std::collections::HashMap;
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::cell::RefCell;
@@ -90,11 +93,11 @@ impl ThreadCache {
         for i in 0..self.used {
             // Deallocate all cached pointers
             unsafe {
-                let layout = alloc::alloc::Layout::from_size_align_unchecked(
+                let layout = Layout::from_size_align_unchecked(
                     self.entries[i].size,
                     CACHE_ALIGNMENT,
                 );
-                alloc::alloc::dealloc(self.entries[i].ptr, layout);
+                dealloc(self.entries[i].ptr, layout);
             }
         }
         self.used = 0;
@@ -106,11 +109,11 @@ impl ThreadCache {
         let clear_count = self.used / 2;
         for i in 0..clear_count {
             unsafe {
-                let layout = alloc::alloc::Layout::from_size_align_unchecked(
+                let layout = Layout::from_size_align_unchecked(
                     self.entries[i].size,
                     CACHE_ALIGNMENT,
                 );
-                alloc::alloc::dealloc(self.entries[i].ptr, layout);
+                dealloc(self.entries[i].ptr, layout);
             }
         }
         

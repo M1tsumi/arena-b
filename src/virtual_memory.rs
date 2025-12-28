@@ -1,5 +1,7 @@
 //! Virtual memory strategy for large arena allocations
 
+extern crate alloc;
+
 use alloc::alloc::{alloc, dealloc, Layout};
 use core::ptr;
 
@@ -98,7 +100,7 @@ impl VirtualMemoryRegion {
             #[cfg(unix)]
             {
                 let result = libc::mprotect(
-                    commit_ptr,
+                    commit_ptr as *mut libc::c_void,
                     size,
                     libc::PROT_READ | libc::PROT_WRITE,
                 );
@@ -150,7 +152,7 @@ impl VirtualMemoryRegion {
             #[cfg(unix)]
             {
                 let result = libc::mprotect(
-                    decommit_ptr,
+                    decommit_ptr as *mut libc::c_void,
                     size,
                     libc::PROT_NONE,
                 );
@@ -161,11 +163,11 @@ impl VirtualMemoryRegion {
                 // Also discard the pages to free physical memory
                 #[cfg(target_os = "macos")]
                 {
-                    libc::madvise(decommit_ptr, size, libc::MADV_FREE);
+                    libc::madvise(decommit_ptr as *mut libc::c_void, size, libc::MADV_FREE);
                 }
                 #[cfg(not(target_os = "macos"))]
                 {
-                    libc::madvise(decommit_ptr, size, libc::MADV_DONTNEED);
+                    libc::madvise(decommit_ptr as *mut libc::c_void, size, libc::MADV_DONTNEED);
                 }
             }
         }
@@ -205,7 +207,7 @@ impl Drop for VirtualMemoryRegion {
                 }
                 #[cfg(unix)]
                 {
-                    libc::munmap(self.ptr, self.reserved_size);
+                    libc::munmap(self.ptr as *mut libc::c_void, self.reserved_size);
                 }
             }
         }

@@ -1,5 +1,7 @@
 //! Lock-free optimizations for better concurrent performance
 
+extern crate alloc;
+
 use alloc::alloc::{alloc, dealloc, Layout};
 use alloc::sync::Arc;
 use core::cmp;
@@ -322,6 +324,10 @@ impl LockFreeStats {
         )
     }
 
+    pub fn get_stats(&self) -> (usize, usize, usize, usize) {
+        self.get()
+    }
+
     pub fn reset(&self) {
         self.allocations.store(0, Ordering::Relaxed);
         self.cache_hits.store(0, Ordering::Relaxed);
@@ -433,7 +439,7 @@ pub struct LockFreePool<T> {
 }
 
 struct LockFreePoolInner<T> {
-    head: AtomicPtr<u8>,
+    head: AtomicPtr<LockFreeNode<T>>,
     stats: LockFreeStats,
 }
 
@@ -512,7 +518,7 @@ impl<T> LockFreePool<T> {
 
             match self.pool.head.compare_exchange_weak(
                 head,
-                node_ptr as *mut u8,
+                node_ptr,
                 Ordering::AcqRel,
                 Ordering::Acquire,
             ) {

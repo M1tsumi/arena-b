@@ -1,14 +1,14 @@
 [package]
 name = "arena-b"
-version = "0.9.0"
+version = "1.0.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Ultra-fast bump allocation arena with specialized allocation methods for parsers, game engines, and data processing"
+description = "Production-grade bump allocator with lock-free, slab, and virtual-memory tooling for parsers, game engines, and request-scoped services"
 readme = "README.md"
 repository = "https://github.com/M1tsumi/arena-b"
 homepage = "https://quefep.uk"
 documentation = "https://docs.rs/arena-b"
-keywords = ["allocator", "memory", "arena", "bump", "performance"]
+keywords = ["allocator", "bump", "lock-free", "virtual-memory", "thread-local", "slab", "arena", "performance"]
 categories = ["memory-management", "data-structures"]
 
 [lib]
@@ -29,7 +29,7 @@ criterion = "0.5"
 proptest = "1.4"
 
 [features]
-default = ["stats"]
+default = ["stats", "arena_module"]
 stats = []
 virtual_memory = []
 thread_local = []

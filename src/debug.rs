@@ -1,12 +1,16 @@
 //! Memory safety debugging with guards and use-after-rewind detection
 
-use alloc::collections::HashMap;
+extern crate alloc;
+
+use alloc::alloc::{alloc, dealloc, Layout};
+use std::collections::HashMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use core::sync::RwLock;
+use std::sync::{RwLock, LazyLock};
 
-const GUARD_MAGIC: u64 = 0xDEADBEEFCAFEBABE;
+pub const GUARD_MAGIC: u64 = 0xDEADBEEFCAFEBABE;
+pub const FREED_MAGIC: u64 = 0xFEEDFACECAFEBABE;
 const GUARD_SIZE: usize = 16;
 
 // Debug guard values for corruption detection
@@ -61,18 +65,21 @@ impl DebugGuard {
 
 // Allocation tracking for use-after-rewind detection
 #[derive(Debug, Clone)]
-struct AllocationInfo {
+pub struct AllocationInfo {
     ptr: *mut u8,
     size: usize,
     checkpoint_id: usize,
     captured_backtrace: Option<String>,
 }
 
+unsafe impl Send for AllocationInfo {}
+unsafe impl Sync for AllocationInfo {}
+
 // Global debug state
-static DEBUG_STATE: RwLock<DebugState> = RwLock::new(DebugState::new());
+pub static DEBUG_STATE: LazyLock<RwLock<DebugState>> = LazyLock::new(|| RwLock::new(DebugState::new()));
 static VALIDATION_ENABLED: AtomicBool = AtomicBool::new(false);
 
-struct DebugState {
+pub struct DebugState {
     allocations: HashMap<usize, Vec<AllocationInfo>>,
     arena_checkpoints: HashMap<usize, usize>,
     next_arena_id: AtomicUsize,
@@ -203,14 +210,14 @@ impl DebugState {
                     // Corrupt the guard to detect use-after-rewind
                     unsafe {
                         let guard_ptr = info.ptr.sub(GUARD_SIZE) as *mut DebugGuard;
-                        (*guard_ptr).magic = 0x0BADCODE_u64;
+                        (*guard_ptr).magic = 0xDEADBEEFCAFEBABE;
                     }
                 }
             }
         }
     }
 
-    fn get_stats(&self, arena_id: usize) -> (usize, usize) {
+    pub fn get_stats(&self, arena_id: usize) -> (usize, usize) {
         let total = self.allocations
             .get(&arena_id)
             .map(|allocs| allocs.len())
@@ -219,6 +226,17 @@ impl DebugState {
         let corrupted = self.corrupted_allocations;
         
         (total, corrupted)
+    }
+
+    pub fn get_current_checkpoint_id(&self, arena_id: usize) -> usize {
+        self.arena_checkpoints
+            .get(&arena_id)
+            .copied()
+            .unwrap_or(0)
+    }
+
+    pub fn check_use_after_rewind(&self, arena_id: usize, ptr: *mut u8) -> Result<(), String> {
+        self.validate_allocation(arena_id, ptr).map_err(|e| e.to_string())
     }
 
     fn cleanup_arena(&mut self, arena_id: usize) {
@@ -348,10 +366,10 @@ impl DebugAllocator {
         }
 
         let total_size = size + 2 * GUARD_SIZE + core::mem::size_of::<DebugGuard>();
-        let layout = alloc::alloc::Layout::from_size_align(total_size, 16)
+        let layout = Layout::from_size_align(total_size, 16)
             .expect("Invalid layout for debug allocation");
 
-        let debug_ptr = unsafe { alloc::alloc::alloc(layout) };
+        let debug_ptr = unsafe { alloc(layout) };
         if debug_ptr.is_null() {
             return ptr; // Fallback to original allocation
         }
@@ -399,8 +417,8 @@ impl DebugAllocator {
 
         // Deallocate original pointer
         unsafe {
-            let original_layout = alloc::alloc::Layout::from_size_align_unchecked(size, 1);
-            alloc::alloc::dealloc(ptr, original_layout);
+            let original_layout = Layout::from_size_align_unchecked(size, 1);
+            dealloc(ptr, original_layout);
         }
 
         unsafe {

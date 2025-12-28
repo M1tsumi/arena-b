@@ -1,14 +1,17 @@
 //! Core arena allocation functionality
 
+extern crate alloc;
+
 use alloc::alloc::{alloc, dealloc, Layout};
 use core::cell::UnsafeCell;
 use core::marker::PhantomData;
 use core::mem::{self, MaybeUninit};
 use core::ptr::{self, NonNull};
 use core::slice;
-use core::sync::{atomic::{AtomicUsize, Ordering}, Mutex};
+use core::sync::atomic::{AtomicUsize, Ordering};
 use core::usize;
 use alloc::vec::Vec;
+use std::sync::Mutex;
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
@@ -37,7 +40,7 @@ impl MemoryPool {
     }
 
     pub fn alloc(&mut self) -> Option<NonNull<u8>> {
-        self.slots.pop()
+        self.slots.pop().flatten()
     }
 
     pub fn dealloc(&mut self, ptr: NonNull<u8>) {
@@ -52,9 +55,14 @@ impl MemoryPool {
 }
 
 // Atomic counter for statistics
-#[derive(Clone)]
 pub struct AtomicCounter {
     value: AtomicUsize,
+}
+
+impl std::fmt::Debug for AtomicCounter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AtomicCounter({})", self.value.load(std::sync::atomic::Ordering::Relaxed))
+    }
 }
 
 impl AtomicCounter {
@@ -74,6 +82,30 @@ impl AtomicCounter {
 
     pub fn fetch_add(&self, value: usize, ordering: Ordering) -> usize {
         self.value.fetch_add(value, ordering)
+    }
+}
+
+impl PartialEq<usize> for AtomicCounter {
+    fn eq(&self, other: &usize) -> bool {
+        self.load(Ordering::Acquire) == *other
+    }
+}
+
+impl PartialEq for AtomicCounter {
+    fn eq(&self, other: &Self) -> bool {
+        self.load(Ordering::Acquire) == other.load(Ordering::Acquire)
+    }
+}
+
+impl PartialOrd<usize> for AtomicCounter {
+    fn partial_cmp(&self, other: &usize) -> Option<std::cmp::Ordering> {
+        self.load(Ordering::Acquire).partial_cmp(other)
+    }
+}
+
+impl std::fmt::Display for AtomicCounter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.load(Ordering::Acquire))
     }
 }
 
@@ -142,8 +174,16 @@ impl Chunk {
         self.capacity
     }
 
+    pub fn ptr(&self) -> NonNull<u8> {
+        self.ptr
+    }
+
     pub fn used(&self) -> usize {
         self.used.load(Ordering::Acquire)
+    }
+
+    pub fn set_used(&self, value: usize) {
+        self.used.store(value, Ordering::Release);
     }
 }
 
@@ -162,6 +202,7 @@ pub struct ArenaCheckpoint {
     pub chunk_index: usize,
     pub chunk_offset: usize,
     pub checkpoint_id: usize,
+    pub allocation_count: usize,
 }
 
 // Debug statistics
@@ -176,17 +217,28 @@ pub struct DebugStats {
 }
 
 // Arena statistics
-#[derive(Debug)]
 pub struct ArenaStats {
     pub bytes_used: AtomicCounter,
+    pub bytes_allocated: AtomicCounter,
     pub allocation_count: AtomicCounter,
     pub chunk_count: usize,
+}
+
+impl std::fmt::Debug for ArenaStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ArenaStats")
+            .field("bytes_used", &self.bytes_used)
+            .field("allocation_count", &self.allocation_count)
+            .field("chunk_count", &self.chunk_count)
+            .finish()
+    }
 }
 
 impl ArenaStats {
     pub fn new() -> Self {
         Self {
             bytes_used: AtomicCounter::new(0),
+            bytes_allocated: AtomicCounter::new(0),
             allocation_count: AtomicCounter::new(0),
             chunk_count: 0,
         }
@@ -231,7 +283,7 @@ impl ArenaInner {
             size *= 2;
         }
 
-        Ok(Self {
+        let mut inner = Self {
             chunks: vec![chunk],
             current_chunk: AtomicUsize::new(0),
             checkpoints: Vec::new(),
@@ -247,7 +299,15 @@ impl ArenaInner {
             lockfree_buffer: None,
             #[cfg(feature = "lockfree")]
             lockfree_stats: crate::lockfree::LockFreeStats::new(),
-        })
+        };
+
+        #[cfg(feature = "stats")]
+        {
+            inner.stats.bytes_allocated.store(initial_capacity, Ordering::Relaxed);
+            inner.stats.chunk_count = inner.chunks.len();
+        }
+
+        Ok(inner)
     }
 
     pub fn allocate(&mut self, layout: Layout) -> Option<*mut u8> {
@@ -267,7 +327,7 @@ impl ArenaInner {
         // Try current chunk
         let current_chunk_idx = self.current_chunk.load(Ordering::Acquire);
         if let Some(chunk) = self.chunks.get(current_chunk_idx) {
-            if let Some(ptr) = chunk.allocate(layout) {
+                if let Some(ptr) = chunk.allocate(layout) {
                 #[cfg(feature = "stats")]
                 {
                     self.stats.bytes_used.fetch_add(size, Ordering::Relaxed);
@@ -289,6 +349,7 @@ impl ArenaInner {
         #[cfg(feature = "stats")]
         {
             self.stats.chunk_count = self.chunks.len();
+            self.stats.bytes_allocated.fetch_add(capacity, Ordering::Relaxed);
         }
         Ok(chunk_index)
     }
@@ -309,7 +370,7 @@ impl ArenaInner {
         
         #[cfg(feature = "thread_local")]
         {
-            crate::thread_local_cache::reset_thread_cache();
+            crate::thread_local::reset_thread_cache();
         }
         
         #[cfg(feature = "lockfree")]
@@ -325,10 +386,15 @@ impl ArenaInner {
         let current_chunk = &self.chunks[current_chunk_idx];
         let chunk_offset = current_chunk.used();
         
+        let alloc_count = if cfg!(feature = "stats") {
+            self.stats.allocation_count.load(Ordering::Acquire)
+        } else { 0 };
+
         let checkpoint = ArenaCheckpoint {
             chunk_index: current_chunk_idx,
             chunk_offset,
             checkpoint_id: self.current_checkpoint_id,
+            allocation_count: alloc_count,
         };
         
         self.checkpoints.push(checkpoint);
@@ -376,7 +442,7 @@ impl ArenaInner {
         // Reset thread-local cache
         #[cfg(feature = "thread_local")]
         {
-            crate::thread_local_cache::reset_thread_cache();
+            crate::thread_local::reset_thread_cache();
         }
         
         // Reset lock-free buffer
@@ -394,6 +460,8 @@ impl ArenaInner {
                 bytes_used += chunk.used();
             }
             self.stats.bytes_used.store(bytes_used, Ordering::Release);
+            // bytes_allocated tracks total allocated chunk capacity; keep it unchanged here
+            self.stats.allocation_count.store(checkpoint.allocation_count, Ordering::Release);
         }
     }
 
@@ -443,7 +511,7 @@ impl ArenaBuilder {
         self
     }
 
-    pub fn build(self) -> Result<crate::Arena, &'static str> {
+    pub fn build(self) -> crate::Arena {
         crate::Arena::with_capacity(self.initial_capacity)
     }
 }
