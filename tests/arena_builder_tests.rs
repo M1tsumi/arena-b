@@ -44,6 +44,8 @@ mod tests {
             })
             .initial_capacity(2048)
             .build();
+        // Use the arena variable to avoid unused warning
+        let _ = arena.stats();
 
         // Should have logged the build configuration
         let msgs = messages.lock().unwrap();
