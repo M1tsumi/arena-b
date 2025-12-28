@@ -144,6 +144,10 @@ impl VirtualMemoryRegion {
             return Ok(());
         }
 
+        if offset >= self.reserved_size {
+            return Err("Offset exceeds reserved size");
+        }
+
         let offset = (offset + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
         let size = (size + PAGE_SIZE - 1) & !(PAGE_SIZE - 1);
         let end = offset.checked_add(size).ok_or("Decommit range overflow")?;
@@ -152,9 +156,20 @@ impl VirtualMemoryRegion {
             return Err("Decommit size exceeds committed size");
         }
 
+        // Ensure size is a multiple of page size
+        if size % PAGE_SIZE != 0 {
+            return Err("Size must be a multiple of page size");
+        }
+
         let decommit_ptr = unsafe {
             self.ptr.add(offset)
         };
+
+        if decommit_ptr.is_null() {
+            return Err("Invalid pointer for decommit");
+        }
+
+        eprintln!("Decommitting virtual memory: offset={}, size={}, end={}, committed_size={}", offset, size, end, self.committed_size);
 
         unsafe {
             #[cfg(windows)]

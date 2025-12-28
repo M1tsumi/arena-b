@@ -493,6 +493,7 @@ struct LockFreePoolInner<T> {
     stats: LockFreeStats,
 }
 
+#[repr(C)]
 struct LockFreeNode<T> {
     data: T,
     next: AtomicPtr<LockFreeNode<T>>,
@@ -538,9 +539,7 @@ impl<T> LockFreePool<T> {
                     // Extract the data and deallocate the node
                     let data = unsafe { std::ptr::read(&node.data) };
                     unsafe {
-                        let size = std::mem::size_of::<T>() + std::mem::size_of::<AtomicPtr<()>>();
-                        let align = std::mem::align_of::<T>().max(std::mem::align_of::<AtomicPtr<()>>());
-                        let layout = Layout::from_size_align(size, align).unwrap();
+                        let layout = Layout::new::<LockFreeNode<T>>();
                         eprintln!("[LockFree] dealloc ptr={:p} size={}", head as *mut u8, layout.size());
                         eprintln!("[LockFree] backtrace:\n{}", std::backtrace::Backtrace::capture());
                         dealloc(head as *mut u8, layout);
@@ -556,9 +555,7 @@ impl<T> LockFreePool<T> {
     }
 
     pub fn dealloc(&self, data: T) {
-        let size = std::mem::size_of::<T>() + std::mem::size_of::<AtomicPtr<()>>();
-        let align = std::mem::align_of::<T>().max(std::mem::align_of::<AtomicPtr<()>>());
-        let layout = Layout::from_size_align(size, align).unwrap();
+        let layout = Layout::new::<LockFreeNode<T>>();
         let node_ptr = unsafe { alloc(layout) as *mut LockFreeNode<T> };
         if node_ptr.is_null() {
             return;
@@ -610,9 +607,7 @@ impl<T> Drop for LockFreePoolInner<T> {
             let next = node.next.load(Ordering::Acquire);
             
             unsafe {
-                let size = std::mem::size_of::<T>() + std::mem::size_of::<AtomicPtr<()>>();
-                let align = std::mem::align_of::<T>().max(std::mem::align_of::<AtomicPtr<()>>());
-                let layout = Layout::from_size_align(size, align).unwrap();
+                let layout = Layout::new::<LockFreeNode<T>>();
                 eprintln!("[LockFreePoolInner::drop] dealloc node={:p}", head);
                 eprintln!("[LockFree::dealloc] dealloc ptr={:p} size={}", head as *mut u8, layout.size());
                 eprintln!("[LockFreePoolInner::drop] backtrace:\n{}", std::backtrace::Backtrace::capture());

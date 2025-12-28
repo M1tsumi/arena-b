@@ -119,9 +119,12 @@ pub struct Chunk {
 
 impl Chunk {
     pub fn new(capacity: usize) -> Result<Self, &'static str> {
-        if capacity == 0 || capacity % 64 != 0 {
-            return Err("Capacity must be nonzero and a multiple of 64");
+        if capacity == 0 {
+            return Err("Capacity must be nonzero");
         }
+        // Round up to next multiple of 64 for alignment
+        let capacity = (capacity + 63) & !63;
+        eprintln!("Attempting allocation: requested_capacity={} aligned_capacity={} alignment=64", capacity, capacity);
         let layout = Layout::from_size_align(capacity, 64)
             .map_err(|_| "Invalid layout")?;
         

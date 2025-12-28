@@ -268,13 +268,18 @@ impl Arena {
     /// Create an arena with virtual memory backing
     #[cfg(feature = "virtual_memory")]
     pub fn with_virtual_memory(reserve_size: usize) -> Self {
+        if reserve_size == 0 {
+            panic!("Reserve size must be greater than zero");
+        }
         let capacity = reserve_size.min(64 * 1024); // Start with 64KB committed
         let mut arena = Self::with_capacity(capacity);
         
         // Set up virtual memory region
         let inner = unsafe { &mut *arena.inner.get() };
-        inner.virtual_region = Some(VirtualMemoryRegion::new(reserve_size)
-            .expect("Failed to create virtual memory region"));
+        inner.virtual_region = Some(VirtualMemoryRegion::new(reserve_size).unwrap_or_else(|e| {
+            eprintln!("Error: Failed to create virtual memory region. Reason: {:?}", e);
+            panic!("Failed to create virtual memory region");
+        }));
         
         arena
     }
