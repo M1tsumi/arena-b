@@ -417,8 +417,13 @@ impl DebugAllocator {
 
         // Deallocate original pointer
         unsafe {
-            let original_layout = Layout::from_size_align_unchecked(size, 1);
-            dealloc(ptr, original_layout);
+            if size > 0 {
+                if let Ok(original_layout) = Layout::from_size_align(size, 1) {
+                    dealloc(ptr, original_layout);
+                } else if let Ok(fallback) = Layout::from_size_align(1, 1) {
+                    dealloc(ptr, fallback);
+                }
+            }
         }
 
         unsafe {

@@ -190,8 +190,15 @@ impl Chunk {
 impl Drop for Chunk {
     fn drop(&mut self) {
         unsafe {
-            let layout = Layout::from_size_align_unchecked(self.capacity, 64);
-            dealloc(self.ptr.as_ptr(), layout);
+            if self.capacity > 0 {
+                if let Ok(layout) = Layout::from_size_align(self.capacity, 64) {
+                    dealloc(self.ptr.as_ptr(), layout);
+                } else {
+                    // Fallback: deallocate using a minimal layout
+                    let fallback = Layout::from_size_align(64, 64).unwrap();
+                    dealloc(self.ptr.as_ptr(), fallback);
+                }
+            }
         }
     }
 }

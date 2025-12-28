@@ -93,11 +93,14 @@ impl ThreadCache {
         for i in 0..self.used {
             // Deallocate all cached pointers
             unsafe {
-                let layout = Layout::from_size_align_unchecked(
-                    self.entries[i].size,
-                    CACHE_ALIGNMENT,
-                );
-                dealloc(self.entries[i].ptr, layout);
+                let size = self.entries[i].size;
+                if size > 0 {
+                    if let Ok(layout) = Layout::from_size_align(size, CACHE_ALIGNMENT) {
+                        dealloc(self.entries[i].ptr, layout);
+                    } else if let Ok(fallback) = Layout::from_size_align(CACHE_ALIGNMENT, CACHE_ALIGNMENT) {
+                        dealloc(self.entries[i].ptr, fallback);
+                    }
+                }
             }
         }
         self.used = 0;
@@ -109,11 +112,14 @@ impl ThreadCache {
         let clear_count = self.used / 2;
         for i in 0..clear_count {
             unsafe {
-                let layout = Layout::from_size_align_unchecked(
-                    self.entries[i].size,
-                    CACHE_ALIGNMENT,
-                );
-                dealloc(self.entries[i].ptr, layout);
+                let size = self.entries[i].size;
+                if size > 0 {
+                    if let Ok(layout) = Layout::from_size_align(size, CACHE_ALIGNMENT) {
+                        dealloc(self.entries[i].ptr, layout);
+                    } else if let Ok(fallback) = Layout::from_size_align(CACHE_ALIGNMENT, CACHE_ALIGNMENT) {
+                        dealloc(self.entries[i].ptr, fallback);
+                    }
+                }
             }
         }
         

@@ -263,8 +263,14 @@ impl Drop for LockFreeBuffer {
         let buffer_ptr = self.buffer.load(Ordering::Acquire);
         if !buffer_ptr.is_null() {
             unsafe {
-                let layout = Layout::from_size_align_unchecked(self.capacity, LOCKFREE_ALIGNMENT);
-                dealloc(buffer_ptr, layout);
+                if self.capacity > 0 {
+                    if let Ok(layout) = Layout::from_size_align(self.capacity, LOCKFREE_ALIGNMENT) {
+                        dealloc(buffer_ptr, layout);
+                    } else {
+                        let fallback = Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT).unwrap();
+                        dealloc(buffer_ptr, fallback);
+                    }
+                }
             }
         }
     }
