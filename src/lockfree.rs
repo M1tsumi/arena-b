@@ -289,7 +289,10 @@ impl LockFreeBuffer {
 
     fn try_thread_slab(&self, size: usize, align: usize) -> Option<*mut u8> {
         let owner = self as *const _;
+        #[cfg(feature = "single_thread_fast")]
         let generation = self.generation.get();
+        #[cfg(not(feature = "single_thread_fast"))]
+        let generation = self.generation.load(Ordering::Acquire);
         THREAD_SLAB.with(|cell| {
             let mut slab = cell.get();
             if !slab.matches(owner, generation) {
@@ -369,13 +372,23 @@ impl LockFreeBuffer {
 
     pub fn is_full(&self) -> bool {
         // Check if the buffer is full or if large allocations are overwhelming
-        self.offset.get() >= self.capacity
+        #[cfg(feature = "single_thread_fast")]
+        {
+            self.offset.get() >= self.capacity
+        }
+        #[cfg(not(feature = "single_thread_fast"))]
+        {
+            self.offset.load(Ordering::Acquire) >= self.capacity
+        }
     }
 }
 
 impl Drop for LockFreeBuffer {
     fn drop(&mut self) {
+        #[cfg(feature = "single_thread_fast")]
         let buffer_ptr = self.buffer.get();
+        #[cfg(not(feature = "single_thread_fast"))]
+        let buffer_ptr = self.buffer.load(Ordering::Acquire);
         if !buffer_ptr.is_null() {
             unsafe {
                 if self.capacity > 0 {

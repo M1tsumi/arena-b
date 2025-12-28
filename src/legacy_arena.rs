@@ -226,19 +226,19 @@ impl Arena {
             };
 
             if let Some(ptr) = inner.chunks[chunk_idx].allocate(layout) {
-                return ptr;
-            }
-
-            let new_capacity = layout.size().saturating_mul(2).max(crate::MIN_CHUNK_SIZE);
-            let mut new_chunk = Chunk::new(new_capacity).expect("Failed to allocate new chunk");
-
-            if let Some(ptr) = new_chunk.allocate(layout) {
-                inner.chunks.push(new_chunk);
-                let idx = inner.chunks.len().saturating_sub(1);
-                inner.current_chunk.store(idx, Ordering::Release);
-                return ptr;
+                ptr
             } else {
-                panic!("Failed to allocate in new chunk");
+                let new_capacity = layout.size().saturating_mul(2).max(crate::MIN_CHUNK_SIZE);
+                let mut new_chunk = Chunk::new(new_capacity).expect("Failed to allocate new chunk");
+
+                if let Some(ptr) = new_chunk.allocate(layout) {
+                    inner.chunks.push(new_chunk);
+                    let idx = inner.chunks.len().saturating_sub(1);
+                    inner.current_chunk.store(idx, Ordering::Release);
+                    ptr
+                } else {
+                    panic!("Failed to allocate in new chunk");
+                }
             }
         }
     }

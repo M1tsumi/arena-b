@@ -128,7 +128,7 @@ impl ThreadCache {
         }
 
         self.used -= clear_count;
-        self.total_bytes = self.total_bytes / 2; // Approximate
+        self.total_bytes /= 2; // Approximate
     }
 }
 

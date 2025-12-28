@@ -214,7 +214,7 @@ impl DebugState {
                 if info.checkpoint_id > checkpoint_id {
                     // Corrupt the guard to detect use-after-rewind (write unaligned)
                     unsafe {
-                        let guard_u8 = info.ptr.sub(GUARD_SIZE) as *mut u8;
+                        let guard_u8 = info.ptr.sub(GUARD_SIZE);
                         // Taint the first guard byte to mark corruption without causing aligned deref
                         core::ptr::write_unaligned(guard_u8, 0u8);
                     }
@@ -365,7 +365,12 @@ impl DebugAllocator {
         self.arena_id
     }
 
-    pub fn allocate_with_guard(&self, ptr: *mut u8, size: usize, checkpoint_id: usize) -> *mut u8 {
+    /// # Safety
+    ///
+    /// `ptr` must be a valid, non-null pointer to `size` bytes of initialized data
+    /// allocated by the arena. The caller must ensure `size` is correct and that
+    /// the memory is valid for reads and writes during guard wrapping.
+    pub unsafe fn allocate_with_guard(&self, ptr: *mut u8, size: usize, checkpoint_id: usize) -> *mut u8 {
         if !self.enabled {
             return ptr;
         }

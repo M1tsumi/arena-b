@@ -479,11 +479,13 @@ impl Arena {
                         {
                             let arena_id = self.debug_allocator.arena_id();
                             // Wrap the raw arena pointer with a debug guard allocation
-                            let guarded = self.debug_allocator.allocate_with_guard(
-                                ptr,
-                                size,
-                                inner.current_checkpoint_id,
-                            );
+                            let guarded = unsafe {
+                                self.debug_allocator.allocate_with_guard(
+                                    ptr,
+                                    size,
+                                    inner.current_checkpoint_id,
+                                )
+                            };
                             #[cfg(feature = "stats")]
                             {
                                 inner.stats().bytes_used.fetch_add(size, Ordering::Relaxed);
@@ -530,11 +532,13 @@ impl Arena {
                     #[cfg(feature = "debug")]
                     {
                         let inner = unsafe { &*self.inner.get() };
-                        let guarded = self.debug_allocator.allocate_with_guard(
-                            ptr,
-                            size,
-                            inner.current_checkpoint_id,
-                        );
+                        let guarded = unsafe {
+                            self.debug_allocator.allocate_with_guard(
+                                ptr,
+                                size,
+                                inner.current_checkpoint_id,
+                            )
+                        };
                         #[cfg(feature = "stats")]
                         {
                             let inner = unsafe { &*self.inner.get() };
@@ -568,11 +572,13 @@ impl Arena {
             #[cfg(feature = "debug")]
             {
                 let arena_id = self.debug_allocator.arena_id();
-                let guarded = self.debug_allocator.allocate_with_guard(
-                    ptr,
-                    size,
-                    inner.current_checkpoint_id,
-                );
+                let guarded = unsafe {
+                    self.debug_allocator.allocate_with_guard(
+                        ptr,
+                        size,
+                        inner.current_checkpoint_id,
+                    )
+                };
                 crate::debug::register_allocation(
                     arena_id,
                     guarded,
@@ -602,12 +608,14 @@ impl Arena {
                 if let Some(ptr) = inner.allocate(layout) {
                     #[cfg(feature = "debug")]
                     {
-                        let guarded = self.debug_allocator.allocate_with_guard(
-                            ptr,
-                            size,
-                            inner.current_checkpoint_id,
-                        );
-                        return guarded;
+                        let guarded = unsafe {
+                            self.debug_allocator.allocate_with_guard(
+                                ptr,
+                                size,
+                                inner.current_checkpoint_id,
+                            )
+                        };
+                        guarded
                     }
 
                     #[cfg(not(feature = "debug"))]
@@ -844,7 +852,7 @@ impl Arena {
         let debug_state = crate::debug::DEBUG_STATE
             .read()
             .unwrap_or_else(|poison| poison.into_inner());
-        debug_state.check_use_after_rewind(arena_id, ptr as *mut u8)
+        debug_state.check_use_after_rewind(arena_id, ptr)
     }
 
     /// Gets arena statistics including allocation count and memory usage.
@@ -957,7 +965,7 @@ impl Arena {
             total_allocations,
             active_checkpoints: debug_state
                 .get_current_checkpoint_id(arena_id)
-                .saturating_sub(1) as usize,
+                .saturating_sub(1),
             current_checkpoint_id: debug_state.get_current_checkpoint_id(arena_id),
             corrupted_allocations,
             leak_reports: 0, // Will be populated by leak_report() calls

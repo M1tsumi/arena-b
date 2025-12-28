@@ -69,7 +69,7 @@ impl VirtualMemoryRegion {
         }
         #[cfg(unix)]
         {
-            if ptr == libc::MAP_FAILED as *mut _ {
+            if std::ptr::eq(ptr, libc::MAP_FAILED as *mut _) {
                 let errno = get_errno();
                 eprintln!(
                     "VirtualMemoryRegion::new: mmap failed, reserve_size={} errno={}",
@@ -167,7 +167,7 @@ impl VirtualMemoryRegion {
         }
 
         // Ensure size is a multiple of page size
-        if size % PAGE_SIZE != 0 {
+        if !size.is_multiple_of(PAGE_SIZE) {
             return Err("Size must be a multiple of page size");
         }
 
@@ -294,6 +294,12 @@ impl VirtualChunk {
         })
     }
 
+    /// # Safety
+    ///
+    /// The caller must ensure that `layout` is valid and that the returned pointer
+    /// is used in a manner consistent with the specified `layout`. The pointer must
+    /// not be dereferenced beyond the committed region, and alignment requirements
+    /// must be respected.
     pub unsafe fn allocate(&self, layout: alloc::alloc::Layout) -> Option<*mut u8> {
         let size = layout.size();
         let align = layout.align();
@@ -309,8 +315,9 @@ impl VirtualChunk {
         // Ensure the memory is committed
         if end > self.region.committed_size {
             let additional_size = end - self.region.committed_size;
-            if let Err(_) = (*(&self.region as *const _ as *mut VirtualMemoryRegion))
+            if (*(&self.region as *const _ as *mut VirtualMemoryRegion))
                 .commit(self.region.committed_size, additional_size)
+                .is_err()
             {
                 return None;
             }
