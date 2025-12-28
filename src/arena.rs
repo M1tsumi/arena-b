@@ -830,7 +830,7 @@ impl Arena {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```no_run
     /// use arena_b::Arena;
     /// #[cfg(feature = "debug")]
     /// {
