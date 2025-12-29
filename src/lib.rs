@@ -63,10 +63,6 @@ pub use crate::error::ArenaError;
 #[cfg(not(feature = "arena_module"))]
 pub use self::legacy_arena::{Arena, ArenaBuilder, FeatureBundle, Scope};
 
-// Keep `FeatureBundle` available for compatibility even when the
-// `arena_module` feature is enabled.
-pub use self::legacy_arena::FeatureBundle;
-
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 

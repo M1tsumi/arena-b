@@ -449,11 +449,10 @@ impl ArenaInner {
         let current_chunk = &self.chunks[current_chunk_idx];
         let chunk_offset = current_chunk.used();
 
-        let alloc_count = if cfg!(feature = "stats") {
-            self.stats.allocation_count.load(Ordering::Acquire)
-        } else {
-            0
-        };
+        #[cfg(feature = "stats")]
+        let alloc_count = self.stats.allocation_count.load(Ordering::Acquire);
+        #[cfg(not(feature = "stats"))]
+        let alloc_count = 0;
 
         let checkpoint = ArenaCheckpoint {
             chunk_index: current_chunk_idx,

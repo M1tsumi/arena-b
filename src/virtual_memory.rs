@@ -4,10 +4,6 @@ extern crate alloc;
 
 use alloc::alloc::{alloc, dealloc, Layout};
 use core::ptr;
-
-#[cfg(windows)]
-use core::ffi::OsStrExt;
-
 #[cfg(unix)]
 fn get_errno() -> i32 {
     unsafe { *libc::__errno_location() }
@@ -37,12 +33,12 @@ impl VirtualMemoryRegion {
             #[cfg(windows)]
             {
                 use windows_sys::Win32::System::Memory::{
-                    VirtualAlloc, MEM_RESERVE, MEM_TOP_DOWN, PAGE_READWRITE,
+                    VirtualAlloc, MEM_RESERVE, PAGE_READWRITE,
                 };
                 VirtualAlloc(
                     ptr::null_mut(),
                     reserve_size,
-                    MEM_RESERVE | MEM_TOP_DOWN,
+                    MEM_RESERVE,
                     PAGE_READWRITE,
                 )
             }
@@ -105,11 +101,11 @@ impl VirtualMemoryRegion {
             #[cfg(windows)]
             {
                 use windows_sys::Win32::System::Memory::{
-                    GetLastError, VirtualAlloc, MEM_COMMIT, PAGE_READWRITE,
+                    VirtualAlloc, MEM_COMMIT, PAGE_READWRITE,
                 };
                 let result = VirtualAlloc(commit_ptr as *mut _, size, MEM_COMMIT, PAGE_READWRITE);
                 if result.is_null() {
-                    let err = unsafe { GetLastError() };
+                    let err = windows_sys::Win32::Foundation::GetLastError();
                     return Err(match err {
                         windows_sys::Win32::Foundation::ERROR_NOT_ENOUGH_MEMORY => {
                             "Insufficient virtual memory during commit"
@@ -189,7 +185,7 @@ impl VirtualMemoryRegion {
                 eprintln!("Decommitting: ptr={:?} size={}", decommit_ptr, size);
                 let result = VirtualFree(decommit_ptr as *mut _, size, MEM_DECOMMIT);
                 if result == 0 {
-                    let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+                    let err = windows_sys::Win32::Foundation::GetLastError();
                     eprintln!(
                         "VirtualFree failed: ptr={:?} size={} GetLastError={}",
                         decommit_ptr, size, err
