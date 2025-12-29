@@ -58,7 +58,7 @@ impl VirtualMemoryRegion {
         #[cfg(windows)]
         {
             if ptr.is_null() {
-                let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+                let err = windows_sys::Win32::Foundation::GetLastError();
                 eprintln!("VirtualMemoryRegion::new: VirtualAlloc failed, reserve_size={} GetLastError={}", reserve_size, err);
                 return Err("Failed to reserve virtual memory");
             }
@@ -131,11 +131,11 @@ impl VirtualMemoryRegion {
                 }
 
                 #[cfg(target_os = "macos")]
-                unsafe {
+                {
                     libc::pthread_jit_write_protect_np(0);
                 }
                 #[cfg(target_os = "macos")]
-                unsafe {
+                {
                     libc::pthread_jit_write_protect_np(1);
                 }
             }
