@@ -35,12 +35,7 @@ impl VirtualMemoryRegion {
                 use windows_sys::Win32::System::Memory::{
                     VirtualAlloc, MEM_RESERVE, PAGE_READWRITE,
                 };
-                VirtualAlloc(
-                    ptr::null_mut(),
-                    reserve_size,
-                    MEM_RESERVE,
-                    PAGE_READWRITE,
-                )
+                VirtualAlloc(ptr::null_mut(), reserve_size, MEM_RESERVE, PAGE_READWRITE)
             }
             #[cfg(unix)]
             {
