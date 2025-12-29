@@ -339,9 +339,9 @@ impl SyncArena {
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
         crate::core::ArenaStats {
-            bytes_used: crate::core::AtomicCounter::new(guard.stats().bytes_used()),
-            bytes_allocated: crate::core::AtomicCounter::new(guard.stats().bytes_allocated.load(std::sync::atomic::Ordering::Relaxed)),
-            allocation_count: crate::core::AtomicCounter::new(guard.stats().allocation_count()),
+            bytes_used: crate::core::AtomicCounter::new(guard.stats().bytes_used),
+            bytes_allocated: crate::core::AtomicCounter::new(guard.stats().bytes_allocated),
+            allocation_count: crate::core::AtomicCounter::new(guard.stats().allocation_count),
             chunk_count: guard.stats().chunk_count,
         }
     }
@@ -351,7 +351,7 @@ impl SyncArena {
             .inner
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
-        guard.stats().bytes_allocated.load(std::sync::atomic::Ordering::Relaxed)
+        guard.stats().bytes_allocated
     }
 }
 

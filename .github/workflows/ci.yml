@@ -30,7 +30,8 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Invoke-WebRequest -UseBasicParsing https://sh.rustup.rs -OutFile rustup-init.exe
+          # On Windows, use the native rustup installer binary instead of the Unix shell script
+          Invoke-WebRequest -UseBasicParsing https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
           ./rustup-init.exe -y
           echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           & "$env:USERPROFILE\.cargo\bin\rustup.exe" toolchain install "${{ matrix.rust }}"
