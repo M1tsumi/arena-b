@@ -284,6 +284,8 @@ impl LockFreeBuffer {
         THREAD_SLAB.with(|cell| {
             let mut slab = cell.get();
             slab.invalidate();
+            // Persist invalidation so subsequent calls see the cleared slab
+            cell.set(slab);
         });
     }
 
@@ -297,9 +299,13 @@ impl LockFreeBuffer {
             let mut slab = cell.get();
             if !slab.matches(owner, generation) {
                 slab.invalidate();
+                cell.set(slab);
                 return None;
             }
-            slab.try_alloc(size, align)
+            let ptr = slab.try_alloc(size, align);
+            // Write back the updated offset so the slab progresses correctly
+            cell.set(slab);
+            ptr
         })
     }
 
@@ -336,7 +342,10 @@ impl LockFreeBuffer {
                         let mut slab = cell.get();
                         slab.set_region(self as *const _, buffer_ptr, start, end, generation);
                         self.stats.record_allocation(); // Record allocation
-                        slab.try_alloc(size, align)
+                        let ptr = slab.try_alloc(size, align);
+                        // Persist slab state so future allocations reuse it
+                        cell.set(slab);
+                        ptr
                     });
                 } else {
                     self.stats.record_contention(); // Record contention on failure
@@ -356,7 +365,10 @@ impl LockFreeBuffer {
                         let mut slab = cell.get();
                         slab.set_region(self as *const _, buffer_ptr, start, end, generation);
                         self.stats.record_allocation(); // Record allocation
-                        slab.try_alloc(size, align)
+                        let ptr = slab.try_alloc(size, align);
+                        // Persist slab state so future allocations reuse it
+                        cell.set(slab);
+                        ptr
                     });
                 } else {
                     self.stats.record_contention(); // Record contention on failure

@@ -338,9 +338,12 @@ impl SyncArena {
             .inner
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
-        // TODO: Implement stats method for Arena
-        // For now, return default stats
-        crate::core::ArenaStats::new()
+        crate::core::ArenaStats {
+            bytes_used: crate::core::AtomicCounter::new(guard.stats().bytes_used()),
+            bytes_allocated: crate::core::AtomicCounter::new(guard.stats().bytes_allocated.load(std::sync::atomic::Ordering::Relaxed)),
+            allocation_count: crate::core::AtomicCounter::new(guard.stats().allocation_count()),
+            chunk_count: guard.stats().chunk_count,
+        }
     }
 
     pub fn bytes_allocated(&self) -> usize {
@@ -348,9 +351,7 @@ impl SyncArena {
             .inner
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
-        // TODO: Implement bytes_allocated method for Arena
-        // For now, return 0
-        0
+        guard.stats().bytes_allocated.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 
