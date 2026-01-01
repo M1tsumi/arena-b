@@ -29,9 +29,12 @@ fn reset_allows_reuse() {
     let mut arena = Arena::with_capacity(128);
     let first = arena.alloc(1_u32);
     assert_eq!(*first, 1);
+    #[cfg(feature = "arena_module")]
     unsafe {
         arena.reset();
     }
+    #[cfg(not(feature = "arena_module"))]
+    arena.reset();
     let second = arena.alloc(2_u32);
     assert_eq!(*second, 2);
 }

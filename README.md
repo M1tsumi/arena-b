@@ -9,7 +9,7 @@
 
 **Ultra-fast bump allocation arena for high-performance Rust applications**
 
-`arena-b` is a production-grade bump allocator designed for workloads that create大量短期对象并希望一次性释放它们。它通过顺序分配到连续缓冲区然后同时重置来消除每个对象的释放开销，完全避免内存碎片。
+`arena-b` is a compact, battle-tested bump allocator for workloads that allocate many short-lived objects and prefer bulk reclamation. Allocate objects quickly into contiguous chunks and free them all at once using checkpoints, scopes, or a full reset — eliminating per-object deallocation overhead and fragmentation.
 
 ## Overview
 
@@ -35,20 +35,23 @@ fn main() {
 
 ## Features
 
-- **High Performance**: Bump allocation with thread-local caching and lock-free fast paths
-- **Memory Safety**: Unsafe internals are carefully encapsulated and thoroughly tested
-- **Checkpoint API**: Save and restore allocation state for frame-based or request-scoped patterns
-- **Zero-Cost Abstractions**: Optional features incur no overhead when disabled
-- **Adaptive Capacity Controls** *(v0.7)*: `reserve_additional`, `shrink_to_fit`, and `reset_and_shrink` let you grow ahead of allocation spikes and release memory afterward
-- **Lock-Free Object Pool** *(v0.8)*: Generic `LockFreePool<T>` for zero-contention object reuse in high-frequency allocation patterns
-- **Advanced Debugging** *(v0.6)*: Leak detection, validation hooks, and optional backtraces make it easier to audit arena usage during development
-- **Virtual Memory Instrumentation** *(v0.6)*: Inspect committed bytes at runtime and rely on improved macOS/Windows handling for large reserves
+- **Fast bump allocation**: Extremely low-overhead allocations by bumping a pointer inside chunks.
+- **Thread-local caches**: Per-thread hand-offs for the smallest allocations to reduce contention in multithreaded workloads.
+- **Lock-free fast-paths**: Optional lock-free buffer for very small allocations to reduce synchronization overhead.
+- **Checkpoint & scopes**: Save/restore allocation state (`checkpoint`/`rewind_to_checkpoint`) and `scope()` for panic-safe temporary allocations.
+- **Virtual memory backing** *(optional)*: Reserve large address spaces and commit pages on demand to keep the committed footprint small.
+- **Slab allocator** *(optional)*: Size-class based caching for frequent small object sizes.
+- **Debug tooling** *(optional)*: Guard-based use-after-rewind detection, leak reports and richer diagnostics when the `debug` feature is enabled.
+- **Fine-grained feature flags**: Only enable what you need — `virtual_memory`, `thread_local`, `lockfree`, `slab`, `debug`, `stats`.
 
-## What's New in v0.9
+## What's New in v1.0.0
 
-- **Slab allocator feature flag (`slab`)**: Optional size-class caching for small allocations
-- **Arena chunk usage telemetry**: `Arena::chunk_usage()` and `ArenaChunkUsage` provide per-chunk used/capacity snapshots
-- **Debug consistency across fast paths**: Debug tracking covers fast-path allocations and checkpoint bookkeeping reliably when `debug` is enabled
+- Stabilized public API and feature-gated modules for predictable builds and smaller compile cost when optional features are disabled.
+- `ArenaBuilder` to configure arenas declaratively (chunk size, reserve size, thread safety, diagnostics sink).
+- Graceful virtual memory handling: `Arena::with_virtual_memory` logs and falls back in restricted environments — check logs if you require strict failure behavior.
+- Improved runtime diagnostics: `Arena::chunk_usage()`, `virtual_memory_committed_bytes()`, and `LockFreeStats::cache_hit_rate()`.
+
+See `CHANGELOG.md` for the complete release notes and migration tips.
 
 ## What's New in v0.8
 
@@ -223,18 +226,16 @@ cargo bench --all
 
 View detailed performance reports in `benches/` directory.
 
-## When to Use arena-b
+## When to Use `arena-b`
 
-**Recommended Use Cases:**
-- Parsers and compilers (ASTs, intermediate representations)
-- Game engines (per-frame temporary allocations)
-- Web servers (per-request data structures)
-- Any workload with many short-lived objects
+Recommended use cases:
+- Parsers and compilers (ASTs and intermediate representations)
+- Game engines and simulations (per-frame or transient data)
+- Web servers and request-oriented services (per-request temporary data)
 
-**Less Suitable For:**
-- Long-lived objects with heterogeneous lifetimes
-- Applications with minimal allocation requirements
-- Scenarios requiring fine-grained memory control
+Not suitable for:
+- Long-lived objects with mixed lifetimes where individual free is required
+- Programs that need fine-grained control of each allocation lifetime
 
 ## API Reference
 

@@ -3,11 +3,11 @@
 extern crate alloc;
 
 use alloc::alloc::{alloc, dealloc, Layout};
-use std::collections::HashMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{RwLock, LazyLock};
+use std::collections::HashMap;
+use std::sync::{LazyLock, RwLock};
 
 pub const GUARD_MAGIC: u64 = 0xDEADBEEFCAFEBABE;
 pub const FREED_MAGIC: u64 = 0xFEEDFACECAFEBABE;
@@ -33,13 +33,14 @@ impl DebugGuard {
             size,
             checkpoint_id,
         };
-        
-        // Write magic pattern to guards
+
+        // Write magic pattern to guards using byte pattern to avoid large shifts
+        let bytes = GUARD_MAGIC.to_ne_bytes();
         for i in 0..GUARD_SIZE {
-            guard.pre_guard[i] = ((GUARD_MAGIC >> (i * 8)) & 0xFF) as u8;
-            guard.post_guard[i] = ((GUARD_MAGIC >> ((i + GUARD_SIZE) * 8)) & 0xFF) as u8;
+            guard.pre_guard[i] = bytes[i % bytes.len()];
+            guard.post_guard[i] = bytes[i % bytes.len()];
         }
-        
+
         guard
     }
 
@@ -48,12 +49,12 @@ impl DebugGuard {
             return Err("Magic number corrupted");
         }
 
+        let bytes = GUARD_MAGIC.to_ne_bytes();
         for i in 0..GUARD_SIZE {
-            let expected = ((GUARD_MAGIC >> (i * 8)) & 0xFF) as u8;
+            let expected = bytes[i % bytes.len()];
             if self.pre_guard[i] != expected {
                 return Err("Pre-guard corrupted");
             }
-            let expected = ((GUARD_MAGIC >> ((i + GUARD_SIZE) * 8)) & 0xFF) as u8;
             if self.post_guard[i] != expected {
                 return Err("Post-guard corrupted");
             }
@@ -76,7 +77,8 @@ unsafe impl Send for AllocationInfo {}
 unsafe impl Sync for AllocationInfo {}
 
 // Global debug state
-pub static DEBUG_STATE: LazyLock<RwLock<DebugState>> = LazyLock::new(|| RwLock::new(DebugState::new()));
+pub static DEBUG_STATE: LazyLock<RwLock<DebugState>> =
+    LazyLock::new(|| RwLock::new(DebugState::new()));
 static VALIDATION_ENABLED: AtomicBool = AtomicBool::new(false);
 
 pub struct DebugState {
@@ -96,23 +98,29 @@ impl DebugState {
             next_arena_id: AtomicUsize::new(1),
             corrupted_allocations: 0,
             leak_reports: 0,
-            backtraces_enabled: cfg!(feature = "debug_backtrace"),
+            backtraces_enabled: cfg!(feature = "debug"),
         }
     }
 
-    fn register_allocation(&mut self, arena_id: usize, ptr: *mut u8, size: usize, checkpoint_id: usize) {
+    fn register_allocation(
+        &mut self,
+        arena_id: usize,
+        ptr: *mut u8,
+        size: usize,
+        checkpoint_id: usize,
+    ) {
         let info = AllocationInfo {
             ptr,
             size,
             checkpoint_id,
             captured_backtrace: self.capture_backtrace(),
         };
-        
+
         self.allocations
             .entry(arena_id)
             .or_insert_with(Vec::new)
             .push(info);
-        
+
         self.arena_checkpoints.insert(arena_id, checkpoint_id);
     }
 
@@ -126,20 +134,17 @@ impl DebugState {
                             return Err("Use-after-rewind detected");
                         }
                     }
-                    
-                    // Validate guard bytes
-                    let guard_ptr = unsafe {
-                        ptr.sub(GUARD_SIZE)
-                    };
-                    let guard = unsafe {
-                        &*(guard_ptr as *const DebugGuard)
-                    };
-                    
-                    return guard.validate();
+
+                    // Validate guard bytes (use unaligned read to avoid UB)
+                    let guard_ptr = unsafe { ptr.sub(GUARD_SIZE) };
+                    let guard_val =
+                        unsafe { core::ptr::read_unaligned(guard_ptr as *const DebugGuard) };
+
+                    return guard_val.validate();
                 }
             }
         }
-        
+
         Err("Allocation not found")
     }
 
@@ -171,12 +176,12 @@ impl DebugState {
             return None;
         }
 
-        #[cfg(feature = "debug_backtrace")]
+        #[cfg(feature = "debug")]
         {
             Some(std::backtrace::Backtrace::capture().to_string())
         }
 
-        #[cfg(not(feature = "debug_backtrace"))]
+        #[cfg(not(feature = "debug"))]
         {
             None
         }
@@ -202,15 +207,16 @@ impl DebugState {
 
     fn rewind_to_checkpoint(&mut self, arena_id: usize, checkpoint_id: usize) {
         self.arena_checkpoints.insert(arena_id, checkpoint_id);
-        
+
         // Mark allocations from future checkpoints as invalid
         if let Some(allocations) = self.allocations.get_mut(&arena_id) {
             for info in allocations.iter_mut() {
                 if info.checkpoint_id > checkpoint_id {
-                    // Corrupt the guard to detect use-after-rewind
+                    // Corrupt the guard to detect use-after-rewind (write unaligned)
                     unsafe {
-                        let guard_ptr = info.ptr.sub(GUARD_SIZE) as *mut DebugGuard;
-                        (*guard_ptr).magic = 0xDEADBEEFCAFEBABE;
+                        let guard_u8 = info.ptr.sub(GUARD_SIZE);
+                        // Taint the first guard byte to mark corruption without causing aligned deref
+                        core::ptr::write_unaligned(guard_u8, 0u8);
                     }
                 }
             }
@@ -218,25 +224,24 @@ impl DebugState {
     }
 
     pub fn get_stats(&self, arena_id: usize) -> (usize, usize) {
-        let total = self.allocations
+        let total = self
+            .allocations
             .get(&arena_id)
             .map(|allocs| allocs.len())
             .unwrap_or(0);
-        
+
         let corrupted = self.corrupted_allocations;
-        
+
         (total, corrupted)
     }
 
     pub fn get_current_checkpoint_id(&self, arena_id: usize) -> usize {
-        self.arena_checkpoints
-            .get(&arena_id)
-            .copied()
-            .unwrap_or(0)
+        self.arena_checkpoints.get(&arena_id).copied().unwrap_or(0)
     }
 
     pub fn check_use_after_rewind(&self, arena_id: usize, ptr: *mut u8) -> Result<(), String> {
-        self.validate_allocation(arena_id, ptr).map_err(|e| e.to_string())
+        self.validate_allocation(arena_id, ptr)
+            .map_err(|e| e.to_string())
     }
 
     fn cleanup_arena(&mut self, arena_id: usize) {
@@ -360,14 +365,32 @@ impl DebugAllocator {
         self.arena_id
     }
 
-    pub fn allocate_with_guard(&self, ptr: *mut u8, size: usize, checkpoint_id: usize) -> *mut u8 {
+    /// # Safety
+    ///
+    /// `ptr` must be a valid, non-null pointer to `size` bytes of initialized data
+    /// allocated by the arena. The caller must ensure `size` is correct and that
+    /// the memory is valid for reads and writes during guard wrapping.
+    pub unsafe fn allocate_with_guard(
+        &self,
+        ptr: *mut u8,
+        size: usize,
+        checkpoint_id: usize,
+    ) -> *mut u8 {
         if !self.enabled {
             return ptr;
         }
 
         let total_size = size + 2 * GUARD_SIZE + core::mem::size_of::<DebugGuard>();
-        let layout = Layout::from_size_align(total_size, 16)
-            .expect("Invalid layout for debug allocation");
+        let layout = match Layout::from_size_align(total_size, 16) {
+            Ok(l) => l,
+            Err(_) => {
+                eprintln!(
+                    "DebugAllocator::allocate_with_guard: invalid layout total_size={}",
+                    total_size
+                );
+                return ptr; // Fallback to original allocation when debug allocation can't be made
+            }
+        };
 
         let debug_ptr = unsafe { alloc(layout) };
         if debug_ptr.is_null() {
@@ -376,7 +399,7 @@ impl DebugAllocator {
 
         // Create debug guard
         let guard = DebugGuard::new(size, checkpoint_id);
-        
+
         unsafe {
             // Copy guard to the beginning
             core::ptr::copy_nonoverlapping(
@@ -384,28 +407,28 @@ impl DebugAllocator {
                 debug_ptr,
                 core::mem::size_of::<DebugGuard>(),
             );
-            
+
             // Copy pre-guard
             core::ptr::copy_nonoverlapping(
                 guard.pre_guard.as_ptr(),
                 debug_ptr.add(core::mem::size_of::<DebugGuard>()),
                 GUARD_SIZE,
             );
-            
+
             // Copy actual data
             core::ptr::copy_nonoverlapping(
                 ptr,
                 debug_ptr.add(core::mem::size_of::<DebugGuard>() + GUARD_SIZE),
                 size,
             );
-            
+
             // Copy post-guard
             core::ptr::copy_nonoverlapping(
                 guard.post_guard.as_ptr(),
                 debug_ptr.add(core::mem::size_of::<DebugGuard>() + GUARD_SIZE + size),
                 GUARD_SIZE,
             );
-            
+
             // Register allocation
             register_allocation(
                 self.arena_id,
@@ -415,15 +438,9 @@ impl DebugAllocator {
             );
         }
 
-        // Deallocate original pointer
-        unsafe {
-            let original_layout = Layout::from_size_align_unchecked(size, 1);
-            dealloc(ptr, original_layout);
-        }
+        // Do not deallocate the original pointer here — it may belong to arena chunks.
 
-        unsafe {
-            debug_ptr.add(core::mem::size_of::<DebugGuard>() + GUARD_SIZE)
-        }
+        unsafe { debug_ptr.add(core::mem::size_of::<DebugGuard>() + GUARD_SIZE) }
     }
 
     pub fn validate_pointer(&self, ptr: *mut u8) -> Result<(), &'static str> {
@@ -466,13 +483,13 @@ pub fn validate_all_allocations(arena_id: usize) -> Result<(), String> {
     if let Ok(state) = DEBUG_STATE.read() {
         if let Some(allocations) = state.allocations.get(&arena_id) {
             let mut errors = Vec::new();
-            
+
             for info in allocations {
                 if let Err(e) = state.validate_allocation(arena_id, info.ptr) {
                     errors.push(format!("Pointer {:p}: {}", info.ptr, e));
                 }
             }
-            
+
             if errors.is_empty() {
                 Ok(())
             } else {
@@ -491,13 +508,13 @@ pub fn check_memory_corruption(arena_id: usize) -> usize {
     if let Ok(state) = DEBUG_STATE.read() {
         if let Some(allocations) = state.allocations.get(&arena_id) {
             let mut corrupted = 0;
-            
+
             for info in allocations {
                 if state.validate_allocation(arena_id, info.ptr).is_err() {
                     corrupted += 1;
                 }
             }
-            
+
             corrupted
         } else {
             0

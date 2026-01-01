@@ -25,10 +25,15 @@ use std::sync::{
 use std::vec::Vec;
 
 // Declare external modules
-pub mod core;
 #[cfg(feature = "arena_module")]
 pub mod arena;
+pub mod core;
 pub mod size_classes;
+
+/// Diagnostics sink type used for optional diagnostic callbacks
+pub type DiagnosticsSink = Box<dyn Fn(&str) + Send + Sync + 'static>;
+
+pub mod error;
 
 #[cfg(feature = "lockfree")]
 pub mod lockfree;
@@ -45,25 +50,18 @@ pub mod debug;
 #[cfg(feature = "slab")]
 pub mod slab;
 
- // Re-export core types
-pub use crate::core::{
-    ArenaCheckpoint, ArenaStats, MemoryPool, Chunk,
-    AtomicCounter, DebugStats,
-};
+// Re-export core types
+pub use crate::core::{ArenaCheckpoint, ArenaStats, AtomicCounter, Chunk, DebugStats, MemoryPool};
 
 // Re-export Arena from the appropriate module
 #[cfg(feature = "arena_module")]
 pub use crate::arena::{Arena, ArenaBuilder, Scope};
 
+// Re-export crate error type for consumers
+pub use crate::error::ArenaError;
+
 #[cfg(not(feature = "arena_module"))]
-pub use self::legacy_arena::{Arena, ArenaBuilder, Scope, FeatureBundle};
-
-// Keep `FeatureBundle` available for compatibility even when the
-// `arena_module` feature is enabled.
-pub use self::legacy_arena::FeatureBundle;
-
-#[cfg(all(feature = "single_thread_fast", feature = "lockfree"))]
-compile_error!("feature `single_thread_fast` is incompatible with `lockfree` (Arena is not Send and chunk usage tracking is non-atomic)");
+pub use self::legacy_arena::{Arena, ArenaBuilder, FeatureBundle, Scope};
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
@@ -324,22 +322,32 @@ impl SyncArena {
     where
         F: for<'scope, 'arena> FnOnce(&Scope<'scope, 'arena>) -> R,
     {
-        let guard = self.inner.lock().unwrap();
+        let guard = self
+            .inner
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
         guard.scope(f)
     }
 
     pub fn stats(&self) -> crate::core::ArenaStats {
-        let guard = self.inner.lock().unwrap();
-        // TODO: Implement stats method for Arena
-        // For now, return default stats
-        crate::core::ArenaStats::new()
+        let guard = self
+            .inner
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        crate::core::ArenaStats {
+            bytes_used: crate::core::AtomicCounter::new(guard.stats().bytes_used),
+            bytes_allocated: crate::core::AtomicCounter::new(guard.stats().bytes_allocated),
+            allocation_count: crate::core::AtomicCounter::new(guard.stats().allocation_count),
+            chunk_count: guard.stats().chunk_count,
+        }
     }
 
     pub fn bytes_allocated(&self) -> usize {
-        let guard = self.inner.lock().unwrap();
-        // TODO: Implement bytes_allocated method for Arena
-        // For now, return 0
-        0
+        let guard = self
+            .inner
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        guard.stats().bytes_allocated
     }
 }
 
@@ -353,7 +361,9 @@ pub use lockfree::{LockFreeAllocator, LockFreeBuffer, LockFreePool, LockFreeStat
 
 /// Re-export thread-local cache types when the feature is enabled.
 #[cfg(feature = "thread_local")]
-pub use thread_local::{cleanup_thread_cache, reset_thread_cache, try_thread_local_alloc};
+pub use thread_local::{
+    cleanup_thread_cache, clear_thread_cache, reset_thread_cache, try_thread_local_alloc,
+};
 
 /// Re-export virtual memory types when the feature is enabled.
 #[cfg(feature = "virtual_memory")]

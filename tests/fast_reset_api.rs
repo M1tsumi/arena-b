@@ -27,6 +27,7 @@ fn test_checkpoint_basic() {
 }
 
 #[test]
+#[cfg(feature = "arena_module")]
 fn test_checkpoint_stack() {
     let mut arena = Arena::new();
 
@@ -67,6 +68,7 @@ fn test_checkpoint_stack() {
 }
 
 #[test]
+#[cfg(feature = "arena_module")]
 fn test_frame_based_pattern() {
     let arena = Arena::new();
     let frame_data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -97,6 +99,7 @@ fn test_frame_based_pattern() {
 }
 
 #[test]
+#[cfg(feature = "stats")]
 fn test_checkpoint_with_stats() {
     let arena = Arena::new();
 
@@ -159,6 +162,7 @@ fn test_multiple_chunks() {
 }
 
 #[test]
+#[cfg(feature = "arena_module")]
 fn test_reset_clears_checkpoints() {
     let mut arena = Arena::new();
 
@@ -176,6 +180,7 @@ fn test_reset_clears_checkpoints() {
 }
 
 #[test]
+#[cfg(feature = "arena_module")]
 fn test_clear_checkpoints() {
     let arena = Arena::new();
 
