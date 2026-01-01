@@ -1,1093 +1,646 @@
-2026-01-01T02:40:54.5724463Z Current runner version: '2.330.0'
-2026-01-01T02:40:54.5762038Z ##[group]Runner Image Provisioner
-2026-01-01T02:40:54.5763340Z Hosted Compute Agent
-2026-01-01T02:40:54.5764175Z Version: 20251211.462
-2026-01-01T02:40:54.5765261Z Commit: 6cbad8c2bb55d58165063d031ccabf57e2d2db61
-2026-01-01T02:40:54.5766376Z Build Date: 2025-12-11T16:28:49Z
-2026-01-01T02:40:54.5767421Z Worker ID: {fd78a730-b7ae-4f76-948c-e29ecdb59e53}
-2026-01-01T02:40:54.5769017Z ##[endgroup]
-2026-01-01T02:40:54.5769884Z ##[group]Operating System
-2026-01-01T02:40:54.5770760Z Microsoft Windows Server 2025
-2026-01-01T02:40:54.5771790Z 10.0.26100
-2026-01-01T02:40:54.5772552Z Datacenter
-2026-01-01T02:40:54.5773241Z ##[endgroup]
-2026-01-01T02:40:54.5773899Z ##[group]Runner Image
-2026-01-01T02:40:54.5774382Z Image: windows-2025
-2026-01-01T02:40:54.5774858Z Version: 20251216.149.1
-2026-01-01T02:40:54.5776220Z Included Software: https://github.com/actions/runner-images/blob/win25/20251216.149/images/windows/Windows2025-Readme.md
-2026-01-01T02:40:54.5777708Z Image Release: https://github.com/actions/runner-images/releases/tag/win25%2F20251216.149
-2026-01-01T02:40:54.5778573Z ##[endgroup]
-2026-01-01T02:40:54.5779605Z ##[group]GITHUB_TOKEN Permissions
-2026-01-01T02:40:54.5781524Z Contents: read
-2026-01-01T02:40:54.5782049Z Metadata: read
-2026-01-01T02:40:54.5782523Z Packages: read
-2026-01-01T02:40:54.5783006Z ##[endgroup]
-2026-01-01T02:40:54.5785020Z Secret source: Actions
-2026-01-01T02:40:54.5785677Z Prepare workflow directory
-2026-01-01T02:40:54.6235946Z Prepare all required actions
-2026-01-01T02:40:54.6294097Z Getting action download info
-2026-01-01T02:40:54.8355428Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
-2026-01-01T02:40:55.0923297Z Complete job name: build-test (windows-latest, stable)
-2026-01-01T02:40:55.2522886Z ##[group]Run actions/checkout@v4
-2026-01-01T02:40:55.2524101Z with:
-2026-01-01T02:40:55.2524560Z   repository: M1tsumi/arena-b
-2026-01-01T02:40:55.2525312Z   token: ***
-2026-01-01T02:40:55.2525775Z   ssh-strict: true
-2026-01-01T02:40:55.2526234Z   ssh-user: git
-2026-01-01T02:40:55.2526695Z   persist-credentials: true
-2026-01-01T02:40:55.2527217Z   clean: true
-2026-01-01T02:40:55.2527671Z   sparse-checkout-cone-mode: true
-2026-01-01T02:40:55.2528226Z   fetch-depth: 1
-2026-01-01T02:40:55.2528666Z   fetch-tags: false
-2026-01-01T02:40:55.2529120Z   show-progress: true
-2026-01-01T02:40:55.2529566Z   lfs: false
-2026-01-01T02:40:55.2529979Z   submodules: false
-2026-01-01T02:40:55.2530357Z   set-safe-directory: true
-2026-01-01T02:40:55.2530960Z ##[endgroup]
-2026-01-01T02:40:55.4305995Z Syncing repository: M1tsumi/arena-b
-2026-01-01T02:40:55.4308214Z ##[group]Getting Git version info
-2026-01-01T02:40:55.4309166Z Working directory is 'D:\a\arena-b\arena-b'
-2026-01-01T02:40:55.5442601Z [command]"C:\Program Files\Git\bin\git.exe" version
-2026-01-01T02:40:55.9932199Z git version 2.52.0.windows.1
-2026-01-01T02:40:55.9999273Z ##[endgroup]
-2026-01-01T02:40:56.0023794Z Temporarily overriding HOME='D:\a\_temp\4da2d6b5-0de1-4aaf-bf1f-25d53db4c639' before making global git config changes
-2026-01-01T02:40:56.0026169Z Adding repository directory to the temporary git global config as a safe directory
-2026-01-01T02:40:56.0036912Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\arena-b\arena-b
-2026-01-01T02:40:56.0693315Z Deleting the contents of 'D:\a\arena-b\arena-b'
-2026-01-01T02:40:56.0700666Z ##[group]Initializing the repository
-2026-01-01T02:40:56.0711097Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\arena-b\arena-b
-2026-01-01T02:40:56.1680341Z Initialized empty Git repository in D:/a/arena-b/arena-b/.git/
-2026-01-01T02:40:56.1730665Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/M1tsumi/arena-b
-2026-01-01T02:40:56.2330402Z ##[endgroup]
-2026-01-01T02:40:56.2331509Z ##[group]Disabling automatic garbage collection
-2026-01-01T02:40:56.2340029Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
-2026-01-01T02:40:56.2653395Z ##[endgroup]
-2026-01-01T02:40:56.2654436Z ##[group]Setting up auth
-2026-01-01T02:40:56.2667279Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
-2026-01-01T02:40:56.2995392Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
-2026-01-01T02:40:57.8417756Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
-2026-01-01T02:40:57.8753232Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
-2026-01-01T02:40:58.4379908Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
-2026-01-01T02:40:58.4705627Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
-2026-01-01T02:40:59.0224700Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
-2026-01-01T02:40:59.0570828Z ##[endgroup]
-2026-01-01T02:40:59.0571611Z ##[group]Fetching the repository
-2026-01-01T02:40:59.0585906Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +5aa13233fe8b58b7814000c972374c08e69feb21:refs/remotes/pull/9/merge
-2026-01-01T02:41:00.0553812Z From https://github.com/M1tsumi/arena-b
-2026-01-01T02:41:00.0557942Z  * [new ref]         5aa13233fe8b58b7814000c972374c08e69feb21 -> pull/9/merge
-2026-01-01T02:41:00.0933577Z ##[endgroup]
-2026-01-01T02:41:00.0934174Z ##[group]Determining the checkout info
-2026-01-01T02:41:00.0937134Z ##[endgroup]
-2026-01-01T02:41:00.0949958Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
-2026-01-01T02:41:00.1460320Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
-2026-01-01T02:41:00.1810727Z ##[group]Checking out the ref
-2026-01-01T02:41:00.1823811Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force refs/remotes/pull/9/merge
-2026-01-01T02:41:00.2676679Z Note: switching to 'refs/remotes/pull/9/merge'.
-2026-01-01T02:41:00.2677146Z 
-2026-01-01T02:41:00.2677485Z You are in 'detached HEAD' state. You can look around, make experimental
-2026-01-01T02:41:00.2678160Z changes and commit them, and you can discard any commits you make in this
-2026-01-01T02:41:00.2678946Z state without impacting any branches by switching back to a branch.
-2026-01-01T02:41:00.2679346Z 
-2026-01-01T02:41:00.2679606Z If you want to create a new branch to retain commits you create, you may
-2026-01-01T02:41:00.2680257Z do so (now or later) by using -c with the switch command. Example:
-2026-01-01T02:41:00.2680646Z 
-2026-01-01T02:41:00.2681181Z   git switch -c <new-branch-name>
-2026-01-01T02:41:00.2682221Z 
-2026-01-01T02:41:00.2682435Z Or undo this operation with:
-2026-01-01T02:41:00.2682701Z 
-2026-01-01T02:41:00.2682809Z   git switch -
-2026-01-01T02:41:00.2683000Z 
-2026-01-01T02:41:00.2683321Z Turn off this advice by setting config variable advice.detachedHead to false
-2026-01-01T02:41:00.2683836Z 
-2026-01-01T02:41:00.2684373Z HEAD is now at 5aa1323 Merge 277052c157caf3faeb127b111faf59027c14fe5a into 14cb37d597b51884d274e7e1459d299c5d5aa258
-2026-01-01T02:41:00.2721086Z ##[endgroup]
-2026-01-01T02:41:00.3163591Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
-2026-01-01T02:41:00.3463251Z 5aa13233fe8b58b7814000c972374c08e69feb21
-2026-01-01T02:41:00.3921195Z ##[group]Run # On Windows, use the native rustup installer binary instead of the Unix shell script
-2026-01-01T02:41:00.3921965Z [36;1m# On Windows, use the native rustup installer binary instead of the Unix shell script[0m
-2026-01-01T02:41:00.3923443Z [36;1mInvoke-WebRequest -UseBasicParsing https://win.rustup.rs/x86_64 -OutFile rustup-init.exe[0m
-2026-01-01T02:41:00.3923895Z [36;1m./rustup-init.exe -y[0m
-2026-01-01T02:41:00.3924287Z [36;1mecho "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append[0m
-2026-01-01T02:41:00.3924822Z [36;1m& "$env:USERPROFILE\.cargo\bin\rustup.exe" toolchain install "stable"[0m
-2026-01-01T02:41:00.3925312Z [36;1m& "$env:USERPROFILE\.cargo\bin\rustup.exe" component add rustfmt clippy --toolchain "stable"[0m
-2026-01-01T02:41:00.4779067Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
-2026-01-01T02:41:00.4779472Z ##[endgroup]
-2026-01-01T02:41:06.6529725Z warn: It looks like you have an existing rustup settings file at:
-2026-01-01T02:41:06.6533739Z warn: C:\Users\runneradmin\.rustup\settings.toml
-2026-01-01T02:41:06.6534586Z warn: Rustup will install the default toolchain as specified in the settings file,
-2026-01-01T02:41:06.6535429Z warn: instead of the one inferred from the default host triple.
-2026-01-01T02:41:06.7396537Z warn: tool `rust-analyzer` is already installed, remove it from `C:\Users\runneradmin\.cargo\bin`, then run `rustup update` to have rustup manage this tool.
-2026-01-01T02:41:06.7398194Z warn: tool `rustfmt` is already installed, remove it from `C:\Users\runneradmin\.cargo\bin`, then run `rustup update` to have rustup manage this tool.
-2026-01-01T02:41:06.7399664Z warn: tool `cargo-fmt` is already installed, remove it from `C:\Users\runneradmin\.cargo\bin`, then run `rustup update` to have rustup manage this tool.
-2026-01-01T02:41:06.8825553Z info: profile set to 'default'
-2026-01-01T02:41:06.8826110Z info: default host triple is x86_64-pc-windows-msvc
-2026-01-01T02:41:06.8832989Z warn: Updating existing toolchain, profile choice will be ignored
-2026-01-01T02:41:09.4360945Z info: syncing channel updates for 'stable-x86_64-pc-windows-msvc'
-2026-01-01T02:41:09.5441841Z info: default toolchain set to 'stable-x86_64-pc-windows-msvc'
-2026-01-01T02:41:09.5442256Z 
-2026-01-01T02:41:09.5646537Z   stable-x86_64-pc-windows-msvc unchanged - rustc 1.92.0 (ded5c06cf 2025-12-08)
-2026-01-01T02:41:09.5647035Z 
-2026-01-01T02:41:09.5647047Z 
-2026-01-01T02:41:09.5647168Z Rust is installed now. Great!
-2026-01-01T02:41:09.5647394Z 
-2026-01-01T02:41:09.5647595Z To get started you may need to restart your current shell.
-2026-01-01T02:41:09.5649142Z This would reload its PATH environment variable to include
-2026-01-01T02:41:09.5649732Z Cargo's bin directory (%USERPROFILE%\.cargo\bin).
-2026-01-01T02:41:09.7389702Z info: syncing channel updates for 'stable-x86_64-pc-windows-msvc'
-2026-01-01T02:41:09.8019744Z 
-2026-01-01T02:41:09.8242933Z   stable-x86_64-pc-windows-msvc unchanged - rustc 1.92.0 (ded5c06cf 2025-12-08)
-2026-01-01T02:41:09.8243516Z 
-2026-01-01T02:41:10.0269615Z info: component 'rustfmt' for target 'x86_64-pc-windows-msvc' is up to date
-2026-01-01T02:41:10.2047383Z info: component 'clippy' for target 'x86_64-pc-windows-msvc' is up to date
-2026-01-01T02:41:10.6286721Z ##[group]Run rustc -Vv
-2026-01-01T02:41:10.6286994Z [36;1mrustc -Vv[0m
-2026-01-01T02:41:10.6287188Z [36;1mrustc --print target-list[0m
-2026-01-01T02:41:10.6362265Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
-2026-01-01T02:41:10.6362583Z ##[endgroup]
-2026-01-01T02:41:11.0094203Z rustc 1.92.0 (ded5c06cf 2025-12-08)
-2026-01-01T02:41:11.0094671Z binary: rustc
-2026-01-01T02:41:11.0095038Z commit-hash: ded5c06cf21d2b93bffd5d884aa6e96934ee4234
-2026-01-01T02:41:11.0095516Z commit-date: 2025-12-08
-2026-01-01T02:41:11.0095830Z host: x86_64-pc-windows-msvc
-2026-01-01T02:41:11.0096154Z release: 1.92.0
-2026-01-01T02:41:11.1172324Z LLVM version: 21.1.3
-2026-01-01T02:41:11.9049368Z aarch64-apple-darwin
-2026-01-01T02:41:11.9049847Z aarch64-apple-ios
-2026-01-01T02:41:11.9050274Z aarch64-apple-ios-macabi
-2026-01-01T02:41:11.9050647Z aarch64-apple-ios-sim
-2026-01-01T02:41:11.9051438Z aarch64-apple-tvos
-2026-01-01T02:41:11.9051786Z aarch64-apple-tvos-sim
-2026-01-01T02:41:11.9052200Z aarch64-apple-visionos
-2026-01-01T02:41:11.9052552Z aarch64-apple-visionos-sim
-2026-01-01T02:41:11.9052912Z aarch64-apple-watchos
-2026-01-01T02:41:11.9053271Z aarch64-apple-watchos-sim
-2026-01-01T02:41:11.9053579Z aarch64-kmc-solid_asp3
-2026-01-01T02:41:11.9053833Z aarch64-linux-android
-2026-01-01T02:41:11.9054122Z aarch64-nintendo-switch-freestanding
-2026-01-01T02:41:11.9054540Z aarch64-pc-windows-gnullvm
-2026-01-01T02:41:11.9054848Z aarch64-pc-windows-msvc
-2026-01-01T02:41:11.9055103Z aarch64-unknown-freebsd
-2026-01-01T02:41:11.9055310Z aarch64-unknown-fuchsia
-2026-01-01T02:41:11.9055516Z aarch64-unknown-hermit
-2026-01-01T02:41:11.9055714Z aarch64-unknown-illumos
-2026-01-01T02:41:11.9055923Z aarch64-unknown-linux-gnu
-2026-01-01T02:41:11.9056150Z aarch64-unknown-linux-gnu_ilp32
-2026-01-01T02:41:11.9056396Z aarch64-unknown-linux-musl
-2026-01-01T02:41:11.9056630Z aarch64-unknown-linux-ohos
-2026-01-01T02:41:11.9056904Z aarch64-unknown-managarm-mlibc
-2026-01-01T02:41:11.9057146Z aarch64-unknown-netbsd
-2026-01-01T02:41:11.9057347Z aarch64-unknown-none
-2026-01-01T02:41:11.9057548Z aarch64-unknown-none-softfloat
-2026-01-01T02:41:11.9057788Z aarch64-unknown-nto-qnx700
-2026-01-01T02:41:11.9058003Z aarch64-unknown-nto-qnx710
-2026-01-01T02:41:11.9058237Z aarch64-unknown-nto-qnx710_iosock
-2026-01-01T02:41:11.9058485Z aarch64-unknown-nto-qnx800
-2026-01-01T02:41:11.9058694Z aarch64-unknown-nuttx
-2026-01-01T02:41:11.9058898Z aarch64-unknown-openbsd
-2026-01-01T02:41:11.9059111Z aarch64-unknown-redox
-2026-01-01T02:41:11.9059354Z aarch64-unknown-teeos
-2026-01-01T02:41:11.9059544Z aarch64-unknown-trusty
-2026-01-01T02:41:11.9059743Z aarch64-unknown-uefi
-2026-01-01T02:41:11.9059938Z aarch64-uwp-windows-msvc
-2026-01-01T02:41:11.9060150Z aarch64-wrs-vxworks
-2026-01-01T02:41:11.9060342Z aarch64_be-unknown-hermit
-2026-01-01T02:41:11.9060560Z aarch64_be-unknown-linux-gnu
-2026-01-01T02:41:11.9060821Z aarch64_be-unknown-linux-gnu_ilp32
-2026-01-01T02:41:11.9061080Z aarch64_be-unknown-linux-musl
-2026-01-01T02:41:11.9061313Z aarch64_be-unknown-netbsd
-2026-01-01T02:41:11.9061532Z aarch64_be-unknown-none-softfloat
-2026-01-01T02:41:11.9061769Z amdgcn-amd-amdhsa
-2026-01-01T02:41:11.9062300Z arm-linux-androideabi
-2026-01-01T02:41:11.9062556Z arm-unknown-linux-gnueabi
-2026-01-01T02:41:11.9062793Z arm-unknown-linux-gnueabihf
-2026-01-01T02:41:11.9063031Z arm-unknown-linux-musleabi
-2026-01-01T02:41:11.9063265Z arm-unknown-linux-musleabihf
-2026-01-01T02:41:11.9063535Z arm64_32-apple-watchos
-2026-01-01T02:41:11.9063738Z arm64e-apple-darwin
-2026-01-01T02:41:11.9063922Z arm64e-apple-ios
-2026-01-01T02:41:11.9064109Z arm64e-apple-tvos
-2026-01-01T02:41:11.9064284Z arm64ec-pc-windows-msvc
-2026-01-01T02:41:11.9064470Z armeb-unknown-linux-gnueabi
-2026-01-01T02:41:11.9064652Z armebv7r-none-eabi
-2026-01-01T02:41:11.9064809Z armebv7r-none-eabihf
-2026-01-01T02:41:11.9064966Z armv4t-none-eabi
-2026-01-01T02:41:11.9065149Z armv4t-unknown-linux-gnueabi
-2026-01-01T02:41:11.9067513Z armv5te-none-eabi
-2026-01-01T02:41:11.9067754Z armv5te-unknown-linux-gnueabi
-2026-01-01T02:41:11.9067975Z armv5te-unknown-linux-musleabi
-2026-01-01T02:41:11.9068181Z armv5te-unknown-linux-uclibceabi
-2026-01-01T02:41:11.9068385Z armv6-unknown-freebsd
-2026-01-01T02:41:11.9068559Z armv6-unknown-netbsd-eabihf
-2026-01-01T02:41:11.9068749Z armv6k-nintendo-3ds
-2026-01-01T02:41:11.9068908Z armv7-linux-androideabi
-2026-01-01T02:41:11.9069079Z armv7-rtems-eabihf
-2026-01-01T02:41:11.9069243Z armv7-sony-vita-newlibeabihf
-2026-01-01T02:41:11.9069533Z armv7-unknown-freebsd
-2026-01-01T02:41:11.9131621Z armv7-unknown-linux-gnueabi
-2026-01-01T02:41:11.9132001Z armv7-unknown-linux-gnueabihf
-2026-01-01T02:41:11.9132427Z armv7-unknown-linux-musleabi
-2026-01-01T02:41:11.9132750Z armv7-unknown-linux-musleabihf
-2026-01-01T02:41:11.9133064Z armv7-unknown-linux-ohos
-2026-01-01T02:41:11.9133340Z armv7-unknown-linux-uclibceabi
-2026-01-01T02:41:11.9134037Z armv7-unknown-linux-uclibceabihf
-2026-01-01T02:41:11.9134472Z armv7-unknown-netbsd-eabihf
-2026-01-01T02:41:11.9134776Z armv7-unknown-trusty
-2026-01-01T02:41:11.9135085Z armv7-wrs-vxworks-eabihf
-2026-01-01T02:41:11.9135374Z armv7a-kmc-solid_asp3-eabi
-2026-01-01T02:41:11.9135684Z armv7a-kmc-solid_asp3-eabihf
-2026-01-01T02:41:11.9135988Z armv7a-none-eabi
-2026-01-01T02:41:11.9136256Z armv7a-none-eabihf
-2026-01-01T02:41:11.9136513Z armv7a-nuttx-eabi
-2026-01-01T02:41:11.9136765Z armv7a-nuttx-eabihf
-2026-01-01T02:41:11.9137014Z armv7a-vex-v5
-2026-01-01T02:41:11.9137247Z armv7k-apple-watchos
-2026-01-01T02:41:11.9137508Z armv7r-none-eabi
-2026-01-01T02:41:11.9137765Z armv7r-none-eabihf
-2026-01-01T02:41:11.9138039Z armv7s-apple-ios
-2026-01-01T02:41:11.9138291Z armv8r-none-eabihf
-2026-01-01T02:41:11.9138559Z avr-none
-2026-01-01T02:41:11.9138793Z bpfeb-unknown-none
-2026-01-01T02:41:11.9139075Z bpfel-unknown-none
-2026-01-01T02:41:11.9139381Z csky-unknown-linux-gnuabiv2
-2026-01-01T02:41:11.9139765Z csky-unknown-linux-gnuabiv2hf
-2026-01-01T02:41:11.9140140Z hexagon-unknown-linux-musl
-2026-01-01T02:41:11.9140916Z hexagon-unknown-none-elf
-2026-01-01T02:41:11.9141219Z i386-apple-ios
-2026-01-01T02:41:11.9141486Z i586-unknown-linux-gnu
-2026-01-01T02:41:11.9141780Z i586-unknown-linux-musl
-2026-01-01T02:41:11.9142056Z i586-unknown-netbsd
-2026-01-01T02:41:11.9142322Z i586-unknown-redox
-2026-01-01T02:41:11.9142573Z i686-apple-darwin
-2026-01-01T02:41:11.9142836Z i686-linux-android
-2026-01-01T02:41:11.9143103Z i686-pc-nto-qnx700
-2026-01-01T02:41:11.9143381Z i686-pc-windows-gnu
-2026-01-01T02:41:11.9143655Z i686-pc-windows-gnullvm
-2026-01-01T02:41:11.9143959Z i686-pc-windows-msvc
-2026-01-01T02:41:11.9144238Z i686-unknown-freebsd
-2026-01-01T02:41:11.9144499Z i686-unknown-haiku
-2026-01-01T02:41:11.9144772Z i686-unknown-hurd-gnu
-2026-01-01T02:41:11.9145054Z i686-unknown-linux-gnu
-2026-01-01T02:41:11.9145358Z i686-unknown-linux-musl
-2026-01-01T02:41:11.9145654Z i686-unknown-netbsd
-2026-01-01T02:41:11.9145945Z i686-unknown-openbsd
-2026-01-01T02:41:11.9146210Z i686-unknown-uefi
-2026-01-01T02:41:11.9146487Z i686-uwp-windows-gnu
-2026-01-01T02:41:11.9146761Z i686-uwp-windows-msvc
-2026-01-01T02:41:11.9147034Z i686-win7-windows-gnu
-2026-01-01T02:41:11.9147300Z i686-win7-windows-msvc
-2026-01-01T02:41:11.9147654Z i686-wrs-vxworks
-2026-01-01T02:41:11.9147915Z loongarch32-unknown-none
-2026-01-01T02:41:11.9148280Z loongarch32-unknown-none-softfloat
-2026-01-01T02:41:11.9148665Z loongarch64-unknown-linux-gnu
-2026-01-01T02:41:11.9149060Z loongarch64-unknown-linux-musl
-2026-01-01T02:41:11.9149393Z loongarch64-unknown-linux-ohos
-2026-01-01T02:41:11.9149708Z loongarch64-unknown-none
-2026-01-01T02:41:11.9150046Z loongarch64-unknown-none-softfloat
-2026-01-01T02:41:11.9150385Z m68k-unknown-linux-gnu
-2026-01-01T02:41:11.9150666Z m68k-unknown-none-elf
-2026-01-01T02:41:11.9150941Z mips-mti-none-elf
-2026-01-01T02:41:11.9151199Z mips-unknown-linux-gnu
-2026-01-01T02:41:11.9151504Z mips-unknown-linux-musl
-2026-01-01T02:41:11.9151728Z mips-unknown-linux-uclibc
-2026-01-01T02:41:11.9152839Z mips64-openwrt-linux-musl
-2026-01-01T02:41:11.9153075Z mips64-unknown-linux-gnuabi64
-2026-01-01T02:41:11.9153298Z mips64-unknown-linux-muslabi64
-2026-01-01T02:41:11.9153513Z mips64el-unknown-linux-gnuabi64
-2026-01-01T02:41:11.9153738Z mips64el-unknown-linux-muslabi64
-2026-01-01T02:41:11.9153940Z mipsel-mti-none-elf
-2026-01-01T02:41:11.9154111Z mipsel-sony-psp
-2026-01-01T02:41:11.9154267Z mipsel-sony-psx
-2026-01-01T02:41:11.9154428Z mipsel-unknown-linux-gnu
-2026-01-01T02:41:11.9154612Z mipsel-unknown-linux-musl
-2026-01-01T02:41:11.9154807Z mipsel-unknown-linux-uclibc
-2026-01-01T02:41:11.9155001Z mipsel-unknown-netbsd
-2026-01-01T02:41:11.9155168Z mipsel-unknown-none
-2026-01-01T02:41:11.9155342Z mipsisa32r6-unknown-linux-gnu
-2026-01-01T02:41:11.9155545Z mipsisa32r6el-unknown-linux-gnu
-2026-01-01T02:41:11.9155759Z mipsisa64r6-unknown-linux-gnuabi64
-2026-01-01T02:41:11.9155984Z mipsisa64r6el-unknown-linux-gnuabi64
-2026-01-01T02:41:11.9156704Z msp430-none-elf
-2026-01-01T02:41:11.9156859Z nvptx64-nvidia-cuda
-2026-01-01T02:41:11.9157029Z powerpc-unknown-freebsd
-2026-01-01T02:41:11.9157214Z powerpc-unknown-linux-gnu
-2026-01-01T02:41:11.9157416Z powerpc-unknown-linux-gnuspe
-2026-01-01T02:41:11.9157619Z powerpc-unknown-linux-musl
-2026-01-01T02:41:11.9157818Z powerpc-unknown-linux-muslspe
-2026-01-01T02:41:11.9158019Z powerpc-unknown-netbsd
-2026-01-01T02:41:11.9158191Z powerpc-unknown-openbsd
-2026-01-01T02:41:11.9158367Z powerpc-wrs-vxworks
-2026-01-01T02:41:11.9158536Z powerpc-wrs-vxworks-spe
-2026-01-01T02:41:11.9158713Z powerpc64-ibm-aix
-2026-01-01T02:41:11.9158878Z powerpc64-unknown-freebsd
-2026-01-01T02:41:11.9159115Z powerpc64-unknown-linux-gnu
-2026-01-01T02:41:11.9159314Z powerpc64-unknown-linux-musl
-2026-01-01T02:41:11.9159501Z powerpc64-unknown-openbsd
-2026-01-01T02:41:11.9159683Z powerpc64-wrs-vxworks
-2026-01-01T02:41:11.9159854Z powerpc64le-unknown-freebsd
-2026-01-01T02:41:11.9160058Z powerpc64le-unknown-linux-gnu
-2026-01-01T02:41:11.9160268Z powerpc64le-unknown-linux-musl
-2026-01-01T02:41:11.9160456Z riscv32-wrs-vxworks
-2026-01-01T02:41:11.9161044Z riscv32e-unknown-none-elf
-2026-01-01T02:41:11.9161241Z riscv32em-unknown-none-elf
-2026-01-01T02:41:11.9161434Z riscv32emc-unknown-none-elf
-2026-01-01T02:41:11.9161620Z riscv32gc-unknown-linux-gnu
-2026-01-01T02:41:11.9161812Z riscv32gc-unknown-linux-musl
-2026-01-01T02:41:11.9161998Z riscv32i-unknown-none-elf
-2026-01-01T02:41:11.9162267Z riscv32im-risc0-zkvm-elf
-2026-01-01T02:41:11.9162559Z riscv32im-unknown-none-elf
-2026-01-01T02:41:11.9162759Z riscv32ima-unknown-none-elf
-2026-01-01T02:41:11.9162955Z riscv32imac-esp-espidf
-2026-01-01T02:41:11.9163239Z riscv32imac-unknown-none-elf
-2026-01-01T02:41:11.9163597Z riscv32imac-unknown-nuttx-elf
-2026-01-01T02:41:11.9164142Z riscv32imac-unknown-xous-elf
-2026-01-01T02:41:11.9164808Z riscv32imafc-esp-espidf
-2026-01-01T02:41:11.9165014Z riscv32imafc-unknown-none-elf
-2026-01-01T02:41:11.9165296Z riscv32imafc-unknown-nuttx-elf
-2026-01-01T02:41:11.9165494Z riscv32imc-esp-espidf
-2026-01-01T02:41:11.9165683Z riscv32imc-unknown-none-elf
-2026-01-01T02:41:11.9165877Z riscv32imc-unknown-nuttx-elf
-2026-01-01T02:41:11.9166071Z riscv64-linux-android
-2026-01-01T02:41:11.9166238Z riscv64-wrs-vxworks
-2026-01-01T02:41:11.9166398Z riscv64a23-unknown-linux-gnu
-2026-01-01T02:41:11.9166589Z riscv64gc-unknown-freebsd
-2026-01-01T02:41:11.9166768Z riscv64gc-unknown-fuchsia
-2026-01-01T02:41:11.9166950Z riscv64gc-unknown-hermit
-2026-01-01T02:41:11.9167136Z riscv64gc-unknown-linux-gnu
-2026-01-01T02:41:11.9167335Z riscv64gc-unknown-linux-musl
-2026-01-01T02:41:11.9167535Z riscv64gc-unknown-managarm-mlibc
-2026-01-01T02:41:11.9167745Z riscv64gc-unknown-netbsd
-2026-01-01T02:41:11.9167923Z riscv64gc-unknown-none-elf
-2026-01-01T02:41:11.9168116Z riscv64gc-unknown-nuttx-elf
-2026-01-01T02:41:11.9168297Z riscv64gc-unknown-openbsd
-2026-01-01T02:41:11.9168491Z riscv64imac-unknown-none-elf
-2026-01-01T02:41:11.9168701Z riscv64imac-unknown-nuttx-elf
-2026-01-01T02:41:11.9168891Z s390x-unknown-linux-gnu
-2026-01-01T02:41:11.9169281Z s390x-unknown-linux-musl
-2026-01-01T02:41:11.9169467Z sparc-unknown-linux-gnu
-2026-01-01T02:41:11.9169641Z sparc-unknown-none-elf
-2026-01-01T02:41:11.9169812Z sparc64-unknown-linux-gnu
-2026-01-01T02:41:11.9169993Z sparc64-unknown-netbsd
-2026-01-01T02:41:11.9170156Z sparc64-unknown-openbsd
-2026-01-01T02:41:11.9170325Z sparcv9-sun-solaris
-2026-01-01T02:41:11.9170477Z thumbv4t-none-eabi
-2026-01-01T02:41:11.9170638Z thumbv5te-none-eabi
-2026-01-01T02:41:11.9170787Z thumbv6m-none-eabi
-2026-01-01T02:41:11.9171036Z thumbv6m-nuttx-eabi
-2026-01-01T02:41:11.9171297Z thumbv7a-nuttx-eabi
-2026-01-01T02:41:11.9171457Z thumbv7a-nuttx-eabihf
-2026-01-01T02:41:11.9171636Z thumbv7a-pc-windows-msvc
-2026-01-01T02:41:11.9171845Z thumbv7a-uwp-windows-msvc
-2026-01-01T02:41:11.9172020Z thumbv7em-none-eabi
-2026-01-01T02:41:11.9172181Z thumbv7em-none-eabihf
-2026-01-01T02:41:11.9172345Z thumbv7em-nuttx-eabi
-2026-01-01T02:41:11.9172671Z thumbv7em-nuttx-eabihf
-2026-01-01T02:41:11.9172840Z thumbv7m-none-eabi
-2026-01-01T02:41:11.9172998Z thumbv7m-nuttx-eabi
-2026-01-01T02:41:11.9173161Z thumbv7neon-linux-androideabi
-2026-01-01T02:41:11.9173381Z thumbv7neon-unknown-linux-gnueabihf
-2026-01-01T02:41:11.9173622Z thumbv7neon-unknown-linux-musleabihf
-2026-01-01T02:41:11.9173836Z thumbv8m.base-none-eabi
-2026-01-01T02:41:11.9174012Z thumbv8m.base-nuttx-eabi
-2026-01-01T02:41:11.9174183Z thumbv8m.main-none-eabi
-2026-01-01T02:41:11.9174365Z thumbv8m.main-none-eabihf
-2026-01-01T02:41:11.9174540Z thumbv8m.main-nuttx-eabi
-2026-01-01T02:41:11.9174720Z thumbv8m.main-nuttx-eabihf
-2026-01-01T02:41:11.9174909Z wasm32-unknown-emscripten
-2026-01-01T02:41:11.9175081Z wasm32-unknown-unknown
-2026-01-01T02:41:11.9175247Z wasm32-wali-linux-musl
-2026-01-01T02:41:11.9175401Z wasm32-wasip1
-2026-01-01T02:41:11.9175554Z wasm32-wasip1-threads
-2026-01-01T02:41:11.9175715Z wasm32-wasip2
-2026-01-01T02:41:11.9175850Z wasm32-wasip3
-2026-01-01T02:41:11.9175994Z wasm32v1-none
-2026-01-01T02:41:11.9176135Z wasm64-unknown-unknown
-2026-01-01T02:41:11.9176303Z x86_64-apple-darwin
-2026-01-01T02:41:11.9176451Z x86_64-apple-ios
-2026-01-01T02:41:11.9176610Z x86_64-apple-ios-macabi
-2026-01-01T02:41:11.9176855Z x86_64-apple-tvos
-2026-01-01T02:41:11.9177151Z x86_64-apple-watchos-sim
-2026-01-01T02:41:11.9177458Z x86_64-fortanix-unknown-sgx
-2026-01-01T02:41:11.9177695Z x86_64-linux-android
-2026-01-01T02:41:11.9177855Z x86_64-lynx-lynxos178
-2026-01-01T02:41:11.9178015Z x86_64-pc-cygwin
-2026-01-01T02:41:11.9178160Z x86_64-pc-nto-qnx710
-2026-01-01T02:41:11.9178328Z x86_64-pc-nto-qnx710_iosock
-2026-01-01T02:41:11.9178502Z x86_64-pc-nto-qnx800
-2026-01-01T02:41:11.9178650Z x86_64-pc-solaris
-2026-01-01T02:41:11.9178807Z x86_64-pc-windows-gnu
-2026-01-01T02:41:11.9178967Z x86_64-pc-windows-gnullvm
-2026-01-01T02:41:11.9179145Z x86_64-pc-windows-msvc
-2026-01-01T02:41:11.9179311Z x86_64-unikraft-linux-musl
-2026-01-01T02:41:11.9179500Z x86_64-unknown-dragonfly
-2026-01-01T02:41:11.9179664Z x86_64-unknown-freebsd
-2026-01-01T02:41:11.9179829Z x86_64-unknown-fuchsia
-2026-01-01T02:41:11.9179982Z x86_64-unknown-haiku
-2026-01-01T02:41:11.9180146Z x86_64-unknown-hermit
-2026-01-01T02:41:11.9180313Z x86_64-unknown-hurd-gnu
-2026-01-01T02:41:11.9180473Z x86_64-unknown-illumos
-2026-01-01T02:41:11.9180638Z x86_64-unknown-l4re-uclibc
-2026-01-01T02:41:11.9181099Z x86_64-unknown-linux-gnu
-2026-01-01T02:41:11.9181339Z x86_64-unknown-linux-gnux32
-2026-01-01T02:41:11.9181525Z x86_64-unknown-linux-musl
-2026-01-01T02:41:11.9181702Z x86_64-unknown-linux-none
-2026-01-01T02:41:11.9181867Z x86_64-unknown-linux-ohos
-2026-01-01T02:41:11.9182046Z x86_64-unknown-managarm-mlibc
-2026-01-01T02:41:11.9182225Z x86_64-unknown-motor
-2026-01-01T02:41:11.9182383Z x86_64-unknown-netbsd
-2026-01-01T02:41:11.9182536Z x86_64-unknown-none
-2026-01-01T02:41:11.9182687Z x86_64-unknown-openbsd
-2026-01-01T02:41:11.9182851Z x86_64-unknown-redox
-2026-01-01T02:41:11.9183005Z x86_64-unknown-trusty
-2026-01-01T02:41:11.9183161Z x86_64-unknown-uefi
-2026-01-01T02:41:11.9183470Z x86_64-uwp-windows-gnu
-2026-01-01T02:41:11.9183645Z x86_64-uwp-windows-msvc
-2026-01-01T02:41:11.9183810Z x86_64-win7-windows-gnu
-2026-01-01T02:41:11.9183978Z x86_64-win7-windows-msvc
-2026-01-01T02:41:11.9184138Z x86_64-wrs-vxworks
-2026-01-01T02:41:11.9184294Z x86_64h-apple-darwin
-2026-01-01T02:41:11.9184459Z xtensa-esp32-espidf
-2026-01-01T02:41:11.9184623Z xtensa-esp32-none-elf
-2026-01-01T02:41:11.9184784Z xtensa-esp32s2-espidf
-2026-01-01T02:41:11.9184955Z xtensa-esp32s2-none-elf
-2026-01-01T02:41:11.9185124Z xtensa-esp32s3-espidf
-2026-01-01T02:41:11.9185286Z xtensa-esp32s3-none-elf
-2026-01-01T02:41:12.0494279Z ##[group]Run cargo fmt --all -- --check
-2026-01-01T02:41:12.0494635Z [36;1mcargo fmt --all -- --check[0m
-2026-01-01T02:41:12.0565991Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
-2026-01-01T02:41:12.0566396Z ##[endgroup]
-2026-01-01T02:41:16.9560746Z ##[group]Run cargo clippy --all-targets --features "debug,virtual_memory,thread_local,lockfree,slab" -- -D warnings
-2026-01-01T02:41:16.9561759Z [36;1mcargo clippy --all-targets --features "debug,virtual_memory,thread_local,lockfree,slab" -- -D warnings[0m
-2026-01-01T02:41:16.9562663Z [36;1mcargo clippy --all-targets --features "single_thread_fast,debug,virtual_memory,thread_local,slab" -- -D warnings[0m
-2026-01-01T02:41:16.9633567Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
-2026-01-01T02:41:16.9633871Z ##[endgroup]
-2026-01-01T02:41:18.8068011Z     Updating crates.io index
-2026-01-01T02:41:19.7611024Z  Downloading crates ...
-2026-01-01T02:41:19.9714846Z   Downloaded cast v0.3.0
-2026-01-01T02:41:20.1658893Z   Downloaded windows-targets v0.52.6
-2026-01-01T02:41:20.3659538Z   Downloaded winapi-util v0.1.11
-2026-01-01T02:41:20.3906707Z   Downloaded walkdir v2.5.0
-2026-01-01T02:41:20.4476161Z   Downloaded unicode-ident v1.0.22
-2026-01-01T02:41:20.5277965Z   Downloaded tempfile v3.23.0
-2026-01-01T02:41:20.5594755Z   Downloaded zerocopy-derive v0.8.27
-2026-01-01T02:41:20.6332181Z   Downloaded serde v1.0.228
-2026-01-01T02:41:20.6687770Z   Downloaded rand v0.9.2
-2026-01-01T02:41:20.7426424Z   Downloaded rayon v1.11.0
-2026-01-01T02:41:21.0028679Z   Downloaded serde_json v1.0.145
-2026-01-01T02:41:21.0850862Z   Downloaded regex v1.12.2
-2026-01-01T02:41:21.1570760Z   Downloaded plotters v0.3.7
-2026-01-01T02:41:21.2678428Z   Downloaded itertools v0.10.5
-2026-01-01T02:41:21.3438030Z   Downloaded proptest v1.9.0
-2026-01-01T02:41:21.4536815Z   Downloaded zerocopy v0.8.27
-2026-01-01T02:41:21.7806571Z   Downloaded clap_builder v4.5.52
-2026-01-01T02:41:21.8542896Z   Downloaded aho-corasick v1.1.4
-2026-01-01T02:41:21.9006871Z   Downloaded syn v2.0.110
-2026-01-01T02:41:21.9991063Z   Downloaded memchr v2.7.6
-2026-01-01T02:41:22.0507930Z   Downloaded rayon-core v1.13.0
-2026-01-01T02:41:22.7958934Z   Downloaded regex-syntax v0.8.8
-2026-01-01T02:41:22.8429680Z   Downloaded num-traits v0.2.19
-2026-01-01T02:41:22.8727347Z   Downloaded getrandom v0.3.4
-2026-01-01T02:41:22.9133402Z   Downloaded crossbeam-utils v0.8.21
-2026-01-01T02:41:22.9484415Z   Downloaded serde_derive v1.0.228
-2026-01-01T02:41:22.9954509Z   Downloaded rand_core v0.9.3
-2026-01-01T02:41:23.0082940Z   Downloaded once_cell v1.21.3
-2026-01-01T02:41:23.0400554Z   Downloaded half v2.7.1
-2026-01-01T02:41:23.0647923Z   Downloaded crossbeam-epoch v0.9.18
-2026-01-01T02:41:23.0976670Z   Downloaded crossbeam-deque v0.8.6
-2026-01-01T02:41:23.1103102Z   Downloaded criterion v0.5.1
-2026-01-01T02:41:23.2012710Z   Downloaded clap v4.5.52
-2026-01-01T02:41:23.3272661Z   Downloaded regex-automata v0.4.13
-2026-01-01T02:41:23.4554660Z   Downloaded bitflags v2.10.0
-2026-01-01T02:41:23.7498170Z   Downloaded ppv-lite86 v0.2.21
-2026-01-01T02:41:23.7622826Z   Downloaded oorandom v11.1.5
-2026-01-01T02:41:23.7705263Z   Downloaded fastrand v2.3.0
-2026-01-01T02:41:23.7894701Z   Downloaded either v1.15.0
-2026-01-01T02:41:23.8055849Z   Downloaded bit-vec v0.8.0
-2026-01-01T02:41:23.8206816Z   Downloaded tinytemplate v1.2.1
-2026-01-01T02:41:23.8451927Z   Downloaded rand_xorshift v0.4.0
-2026-01-01T02:41:23.8562856Z   Downloaded windows_x86_64_msvc v0.52.6
-2026-01-01T02:41:23.8774760Z   Downloaded rand_chacha v0.9.0
-2026-01-01T02:41:23.9145913Z   Downloaded quote v1.0.42
-2026-01-01T02:41:23.9516186Z   Downloaded quick-error v1.2.3
-2026-01-01T02:41:23.9637119Z   Downloaded itoa v1.0.15
-2026-01-01T02:41:23.9801983Z   Downloaded is-terminal v0.4.17
-2026-01-01T02:41:23.9903134Z   Downloaded fnv v1.0.7
-2026-01-01T02:41:23.9993441Z   Downloaded ciborium-ll v0.2.2
-2026-01-01T02:41:24.0094319Z   Downloaded unarray v0.1.4
-2026-01-01T02:41:24.0250278Z   Downloaded serde_core v1.0.228
-2026-01-01T02:41:24.0507629Z   Downloaded same-file v1.0.6
-2026-01-01T02:41:24.0726214Z   Downloaded ryu v1.0.20
-2026-01-01T02:41:24.1047853Z   Downloaded proc-macro2 v1.0.103
-2026-01-01T02:41:24.1427741Z   Downloaded plotters-backend v0.3.7
-2026-01-01T02:41:24.1567182Z   Downloaded cfg-if v1.0.4
-2026-01-01T02:41:24.1751513Z   Downloaded bit-set v0.8.0
-2026-01-01T02:41:24.1872116Z   Downloaded anes v0.1.6
-2026-01-01T02:41:24.2204135Z   Downloaded windows-link v0.2.1
-2026-01-01T02:41:24.2288953Z   Downloaded wait-timeout v0.2.1
-2026-01-01T02:41:24.2442881Z   Downloaded rusty-fork v0.3.1
-2026-01-01T02:41:24.2639986Z   Downloaded plotters-svg v0.3.7
-2026-01-01T02:41:24.2716283Z   Downloaded criterion-plot v0.5.0
-2026-01-01T02:41:24.2909470Z   Downloaded clap_lex v0.7.6
-2026-01-01T02:41:24.3045214Z   Downloaded ciborium-io v0.2.2
-2026-01-01T02:41:24.3120393Z   Downloaded ciborium v0.2.2
-2026-01-01T02:41:24.3378623Z   Downloaded autocfg v1.5.0
-2026-01-01T02:41:24.3628917Z   Downloaded anstyle v1.0.13
-2026-01-01T02:41:24.3858114Z   Downloaded windows-sys v0.59.0
-2026-01-01T02:41:26.0431260Z   Downloaded windows-sys v0.61.2
-2026-01-01T02:41:27.2286492Z    Compiling proc-macro2 v1.0.103
-2026-01-01T02:41:27.2287561Z    Compiling unicode-ident v1.0.22
-2026-01-01T02:41:27.2289069Z    Compiling quote v1.0.42
-2026-01-01T02:41:27.2290874Z     Checking cfg-if v1.0.4
-2026-01-01T02:41:30.3158707Z    Compiling zerocopy v0.8.27
-2026-01-01T02:41:34.9013244Z     Checking windows-link v0.2.1
-2026-01-01T02:41:34.9618049Z    Compiling getrandom v0.3.4
-2026-01-01T02:41:37.0590823Z     Checking windows-sys v0.61.2
-2026-01-01T02:41:37.0596700Z    Compiling crossbeam-utils v0.8.21
-2026-01-01T02:41:37.4370579Z    Compiling serde_core v1.0.228
-2026-01-01T02:41:37.8065324Z    Compiling autocfg v1.5.0
-2026-01-01T02:41:39.1576132Z    Compiling num-traits v0.2.19
-2026-01-01T02:41:39.3628207Z    Compiling syn v2.0.110
-2026-01-01T02:41:39.3833345Z    Compiling serde v1.0.228
-2026-01-01T02:41:39.4351804Z    Compiling windows_x86_64_msvc v0.52.6
-2026-01-01T02:41:39.9370664Z     Checking crossbeam-epoch v0.9.18
-2026-01-01T02:41:40.0001928Z     Checking rand_core v0.9.3
-2026-01-01T02:41:40.1980430Z     Checking regex-syntax v0.8.8
-2026-01-01T02:41:40.2418445Z    Compiling serde_json v1.0.145
-2026-01-01T02:41:40.4880234Z     Checking either v1.15.0
-2026-01-01T02:41:40.7331366Z     Checking once_cell v1.21.3
-2026-01-01T02:41:40.9325047Z    Compiling rayon-core v1.13.0
-2026-01-01T02:41:41.1963886Z     Checking crossbeam-deque v0.8.6
-2026-01-01T02:41:42.1531413Z     Checking winapi-util v0.1.11
-2026-01-01T02:41:42.3108362Z     Checking ryu v1.0.20
-2026-01-01T02:41:42.4587871Z     Checking ciborium-io v0.2.2
-2026-01-01T02:41:42.4677330Z     Checking plotters-backend v0.3.7
-2026-01-01T02:41:42.5256261Z     Checking memchr v2.7.6
-2026-01-01T02:41:42.6759279Z     Checking anstyle v1.0.13
-2026-01-01T02:41:42.6878095Z     Checking fastrand v2.3.0
-2026-01-01T02:41:42.8895625Z     Checking clap_lex v0.7.6
-2026-01-01T02:41:42.8902750Z     Checking itoa v1.0.15
-2026-01-01T02:41:43.0239709Z     Checking tempfile v3.23.0
-2026-01-01T02:41:43.0400172Z     Checking clap_builder v4.5.52
-2026-01-01T02:41:43.2715551Z     Checking regex-automata v0.4.13
-2026-01-01T02:41:44.4184886Z     Checking plotters-svg v0.3.7
-2026-01-01T02:41:44.5592713Z     Checking same-file v1.0.6
-2026-01-01T02:41:44.6643450Z     Checking windows-targets v0.52.6
-2026-01-01T02:41:44.9735852Z     Checking itertools v0.10.5
-2026-01-01T02:41:45.1200233Z     Checking fnv v1.0.7
-2026-01-01T02:41:45.1925630Z     Checking quick-error v1.2.3
-2026-01-01T02:41:45.2249470Z     Checking wait-timeout v0.2.1
-2026-01-01T02:41:45.2714843Z     Checking cast v0.3.0
-2026-01-01T02:41:45.2996872Z     Checking bit-vec v0.8.0
-2026-01-01T02:41:45.4627737Z     Checking rusty-fork v0.3.1
-2026-01-01T02:41:45.5606844Z     Checking bit-set v0.8.0
-2026-01-01T02:41:45.6880667Z     Checking rayon v1.11.0
-2026-01-01T02:41:45.7315085Z     Checking regex v1.12.2
-2026-01-01T02:41:46.1319533Z     Checking clap v4.5.52
-2026-01-01T02:41:46.1807498Z    Compiling zerocopy-derive v0.8.27
-2026-01-01T02:41:46.1887264Z    Compiling serde_derive v1.0.228
-2026-01-01T02:41:46.6628625Z     Checking criterion-plot v0.5.0
-2026-01-01T02:41:46.9825554Z     Checking windows-sys v0.59.0
-2026-01-01T02:41:48.4420013Z     Checking walkdir v2.5.0
-2026-01-01T02:41:48.6162453Z     Checking plotters v0.3.7
-2026-01-01T02:41:48.7251317Z     Checking rand_xorshift v0.4.0
-2026-01-01T02:41:48.8318637Z     Checking rand v0.9.2
-2026-01-01T02:41:49.5570432Z     Checking is-terminal v0.4.17
-2026-01-01T02:41:49.6503166Z     Checking unarray v0.1.4
-2026-01-01T02:41:49.7431309Z     Checking bitflags v2.10.0
-2026-01-01T02:41:49.9055751Z     Checking anes v0.1.6
-2026-01-01T02:41:49.9773501Z     Checking oorandom v11.1.5
-2026-01-01T02:41:50.0715184Z     Checking arena-b v1.0.0 (D:\a\arena-b\arena-b)
-2026-01-01T02:41:51.0965567Z     Checking half v2.7.1
-2026-01-01T02:41:51.0966367Z     Checking ppv-lite86 v0.2.21
-2026-01-01T02:41:51.4555526Z     Checking ciborium-ll v0.2.2
-2026-01-01T02:41:51.5850212Z     Checking tinytemplate v1.2.1
-2026-01-01T02:41:51.6486332Z     Checking ciborium v0.2.2
-2026-01-01T02:41:51.6532578Z     Checking rand_chacha v0.9.0
-2026-01-01T02:41:51.8422174Z     Checking proptest v1.9.0
-2026-01-01T02:41:52.1885649Z     Checking criterion v0.5.1
-2026-01-01T02:41:55.2642703Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 37.80s
-2026-01-01T02:41:55.6331577Z     Checking arena-b v1.0.0 (D:\a\arena-b\arena-b)
-2026-01-01T02:41:57.0306002Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.52s
-2026-01-01T02:41:57.1788268Z ##[group]Run cargo test --features "debug,virtual_memory,thread_local,lockfree,slab"
-2026-01-01T02:41:57.1788890Z [36;1mcargo test --features "debug,virtual_memory,thread_local,lockfree,slab"[0m
-2026-01-01T02:41:57.1789391Z [36;1mcargo test --features "single_thread_fast,debug,virtual_memory,thread_local,slab"[0m
-2026-01-01T02:41:57.1859685Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
-2026-01-01T02:41:57.1859997Z ##[endgroup]
-2026-01-01T02:41:57.7288928Z    Compiling cfg-if v1.0.4
-2026-01-01T02:41:57.7291454Z    Compiling windows-link v0.2.1
-2026-01-01T02:41:57.7299168Z    Compiling zerocopy v0.8.27
-2026-01-01T02:41:57.7307369Z    Compiling serde_core v1.0.228
-2026-01-01T02:41:57.8279678Z    Compiling windows-sys v0.61.2
-2026-01-01T02:41:57.8281081Z    Compiling getrandom v0.3.4
-2026-01-01T02:41:58.1837362Z    Compiling crossbeam-utils v0.8.21
-2026-01-01T02:41:59.1114146Z    Compiling crossbeam-epoch v0.9.18
-2026-01-01T02:41:59.6935875Z    Compiling rand_core v0.9.3
-2026-01-01T02:41:59.9902769Z    Compiling once_cell v1.21.3
-2026-01-01T02:42:00.2345763Z    Compiling regex-syntax v0.8.8
-2026-01-01T02:42:00.2583550Z    Compiling either v1.15.0
-2026-01-01T02:42:00.5457892Z    Compiling half v2.7.1
-2026-01-01T02:42:00.6326553Z    Compiling num-traits v0.2.19
-2026-01-01T02:42:00.9806111Z    Compiling winapi-util v0.1.11
-2026-01-01T02:42:01.3258100Z    Compiling serde v1.0.228
-2026-01-01T02:42:01.5507367Z    Compiling crossbeam-deque v0.8.6
-2026-01-01T02:42:01.7784051Z    Compiling windows_x86_64_msvc v0.52.6
-2026-01-01T02:42:01.8348783Z    Compiling anstyle v1.0.13
-2026-01-01T02:42:01.9181740Z    Compiling ciborium-io v0.2.2
-2026-01-01T02:42:01.9932559Z    Compiling ryu v1.0.20
-2026-01-01T02:42:02.1250956Z    Compiling clap_lex v0.7.6
-2026-01-01T02:42:02.7130402Z    Compiling itoa v1.0.15
-2026-01-01T02:42:02.7141814Z    Compiling plotters-backend v0.3.7
-2026-01-01T02:42:02.7142521Z    Compiling fastrand v2.3.0
-2026-01-01T02:42:02.8559674Z    Compiling memchr v2.7.6
-2026-01-01T02:42:03.0435132Z    Compiling plotters-svg v0.3.7
-2026-01-01T02:42:03.1487586Z    Compiling tempfile v3.23.0
-2026-01-01T02:42:03.3385059Z    Compiling regex-automata v0.4.13
-2026-01-01T02:42:03.9816588Z    Compiling serde_json v1.0.145
-2026-01-01T02:42:04.2734213Z    Compiling clap_builder v4.5.52
-2026-01-01T02:42:06.0806540Z    Compiling ciborium-ll v0.2.2
-2026-01-01T02:42:06.3721654Z    Compiling windows-targets v0.52.6
-2026-01-01T02:42:06.4270705Z    Compiling rayon-core v1.13.0
-2026-01-01T02:42:06.4285391Z    Compiling same-file v1.0.6
-2026-01-01T02:42:06.6055201Z    Compiling itertools v0.10.5
-2026-01-01T02:42:08.0144517Z    Compiling ppv-lite86 v0.2.21
-2026-01-01T02:42:08.5824494Z    Compiling fnv v1.0.7
-2026-01-01T02:42:08.6591574Z    Compiling cast v0.3.0
-2026-01-01T02:42:08.6742732Z    Compiling quick-error v1.2.3
-2026-01-01T02:42:08.7221557Z    Compiling wait-timeout v0.2.1
-2026-01-01T02:42:08.7592147Z    Compiling bit-vec v0.8.0
-2026-01-01T02:42:08.8296910Z    Compiling rusty-fork v0.3.1
-2026-01-01T02:42:08.8972339Z    Compiling criterion-plot v0.5.0
-2026-01-01T02:42:09.1200950Z    Compiling bit-set v0.8.0
-2026-01-01T02:42:09.3048671Z    Compiling rand_chacha v0.9.0
-2026-01-01T02:42:09.5460870Z    Compiling rayon v1.11.0
-2026-01-01T02:42:09.7734046Z    Compiling clap v4.5.52
-2026-01-01T02:42:09.7787908Z    Compiling walkdir v2.5.0
-2026-01-01T02:42:09.8361041Z    Compiling windows-sys v0.59.0
-2026-01-01T02:42:10.4532562Z    Compiling ciborium v0.2.2
-2026-01-01T02:42:10.9005072Z    Compiling regex v1.12.2
-2026-01-01T02:42:11.3026575Z    Compiling tinytemplate v1.2.1
-2026-01-01T02:42:11.5700028Z    Compiling plotters v0.3.7
-2026-01-01T02:42:11.7520701Z    Compiling rand v0.9.2
-2026-01-01T02:42:12.2844083Z    Compiling rand_xorshift v0.4.0
-2026-01-01T02:42:12.5804778Z    Compiling is-terminal v0.4.17
-2026-01-01T02:42:12.6832897Z    Compiling anes v0.1.6
-2026-01-01T02:42:12.8997080Z    Compiling bitflags v2.10.0
-2026-01-01T02:42:12.9855504Z    Compiling oorandom v11.1.5
-2026-01-01T02:42:13.0925206Z    Compiling unarray v0.1.4
-2026-01-01T02:42:13.1131926Z    Compiling criterion v0.5.1
-2026-01-01T02:42:13.1905652Z    Compiling proptest v1.9.0
-2026-01-01T02:42:13.1917209Z    Compiling arena-b v1.0.0 (D:\a\arena-b\arena-b)
-2026-01-01T02:42:23.8382295Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 26.29s
-2026-01-01T02:42:23.8465339Z      Running unittests src\lib.rs (target\debug\deps\arena_b-cd309d91fbde1836.exe)
-2026-01-01T02:42:23.8566909Z 
-2026-01-01T02:42:23.8567274Z running 0 tests
-2026-01-01T02:42:23.8567520Z 
-2026-01-01T02:42:23.8567951Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:23.8568499Z 
-2026-01-01T02:42:23.8585590Z      Running tests\arena_basic.rs (target\debug\deps\arena_basic-6be5ff86c7c09ac1.exe)
-2026-01-01T02:42:23.8675110Z 
-2026-01-01T02:42:23.8675417Z running 7 tests
-2026-01-01T02:42:23.8683230Z test alloc_slice_copy_basic ... ok
-2026-01-01T02:42:23.8685179Z test alloc_slice_copy_zero_len ... ok
-2026-01-01T02:42:23.8685672Z test alloc_slice_uninit_zero_len ... ok
-2026-01-01T02:42:23.8687386Z test alloc_basic ... ok
-2026-01-01T02:42:23.8687740Z test alloc_str_basic ... ok
-2026-01-01T02:42:23.8688557Z test zst_allocation_does_not_consume_space ... ok
-2026-01-01T02:42:23.8689001Z test reset_allows_reuse ... ok
-2026-01-01T02:42:23.8689228Z 
-2026-01-01T02:42:23.8690663Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:23.8691396Z 
-2026-01-01T02:42:23.8706727Z      Running tests\arena_builder_tests.rs (target\debug\deps\arena_builder_tests-7b79d21bf26db086.exe)
-2026-01-01T02:42:23.8797892Z 
-2026-01-01T02:42:23.8798078Z running 5 tests
-2026-01-01T02:42:23.8813126Z test tests::test_arena_builder_feature_bundles ... ok
-2026-01-01T02:42:23.8813735Z test tests::test_arena_builder_individual_features ... ok
-2026-01-01T02:42:23.8814221Z test tests::test_arena_builder_basic ... ok
-2026-01-01T02:42:23.8814617Z test tests::test_arena_builder_diagnostics ... ok
-2026-01-01T02:42:23.8814918Z test tests::test_reset_and_shrink_to_fit ... ok
-2026-01-01T02:42:23.8815093Z 
-2026-01-01T02:42:23.8815307Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:23.8815607Z 
-2026-01-01T02:42:23.8827643Z      Running tests\arena_props.rs (target\debug\deps\arena_props-bf5fa016220a1e6b.exe)
-2026-01-01T02:42:23.8916903Z 
-2026-01-01T02:42:23.8917107Z running 2 tests
-2026-01-01T02:42:23.9048161Z test reset_frees_all_memory ... ok
-2026-01-01T02:42:23.9301872Z test alloc_slice_copy_roundtrip ... ok
-2026-01-01T02:42:23.9302207Z 
-2026-01-01T02:42:23.9302447Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
-2026-01-01T02:42:23.9302758Z 
-2026-01-01T02:42:23.9324237Z      Running tests\chunk_usage.rs (target\debug\deps\chunk_usage-38904b9cdb057c5d.exe)
-2026-01-01T02:42:23.9419338Z 
-2026-01-01T02:42:23.9419546Z running 1 test
-2026-01-01T02:42:23.9433785Z test chunk_usage_reports_used_and_capacity ... ok
-2026-01-01T02:42:23.9434066Z 
-2026-01-01T02:42:23.9434288Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:23.9434600Z 
-2026-01-01T02:42:23.9450959Z      Running tests\fast_reset_api.rs (target\debug\deps\fast_reset_api-fec7ffdb9f22078d.exe)
-2026-01-01T02:42:23.9543064Z 
-2026-01-01T02:42:23.9543495Z running 7 tests
-2026-01-01T02:42:23.9553054Z test test_checkpoint_with_stats ... ok
-2026-01-01T02:42:23.9553884Z test test_checkpoint_basic ... ok
-2026-01-01T02:42:23.9554545Z test test_clear_checkpoints ... ok
-2026-01-01T02:42:23.9556068Z test test_checkpoint_stack ... ok
-2026-01-01T02:42:23.9558238Z test test_reset_clears_checkpoints ... ok
-2026-01-01T02:42:23.9558711Z test test_multiple_chunks ... ok
-2026-01-01T02:42:23.9559128Z test test_frame_based_pattern ... ok
-2026-01-01T02:42:23.9559420Z 
-2026-01-01T02:42:23.9560789Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:23.9561132Z 
-2026-01-01T02:42:23.9576054Z      Running tests\lockfree.rs (target\debug\deps\lockfree-385d9cec8c322838.exe)
-2026-01-01T02:42:23.9665558Z 
-2026-01-01T02:42:23.9665831Z running 8 tests
-2026-01-01T02:42:23.9676639Z test test_lockfree_large_allocations ... ok
-2026-01-01T02:42:23.9677678Z test test_lockfree_basic_allocation ... ok
-2026-01-01T02:42:23.9679784Z test test_lockfree_mixed_sizes ... ok
-2026-01-01T02:42:23.9681599Z test test_lockfree_stats_accuracy ... ok
-2026-01-01T02:42:23.9683630Z test test_lockfree_reset ... ok
-2026-01-01T02:42:23.9685985Z test test_regular_arena_without_lockfree ... ok
-2026-01-01T02:42:23.9687627Z test test_lockfree_with_checkpoints ... ok
-2026-01-01T02:42:23.9698614Z test test_lockfree_contention ... ok
-2026-01-01T02:42:23.9698948Z 
-2026-01-01T02:42:23.9699465Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:23.9699971Z 
-2026-01-01T02:42:23.9718016Z      Running tests\memory_safety.rs (target\debug\deps\memory_safety-7ee5fe65566dc39f.exe)
-2026-01-01T02:42:23.9811585Z 
-2026-01-01T02:42:23.9812114Z running 1 test
-2026-01-01T02:42:23.9816485Z test test_debug_feature_compiles ... ok
-2026-01-01T02:42:23.9816794Z 
-2026-01-01T02:42:23.9817120Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:23.9817419Z 
-2026-01-01T02:42:23.9834022Z      Running tests\memory_safety_simple.rs (target\debug\deps\memory_safety_simple-a634ddf558df6090.exe)
-2026-01-01T02:42:23.9935586Z 
-2026-01-01T02:42:23.9935863Z running 1 test
-2026-01-01T02:42:23.9941541Z test test_debug_feature_compiles ... ok
-2026-01-01T02:42:23.9942203Z 
-2026-01-01T02:42:23.9942639Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:23.9942982Z 
-2026-01-01T02:42:23.9959382Z      Running tests\pool_basic.rs (target\debug\deps\pool_basic-4f4a7d1655c6c6fa.exe)
-2026-01-01T02:42:24.0056946Z 
-2026-01-01T02:42:24.0057491Z running 3 tests
-2026-01-01T02:42:24.0063770Z test pool_alloc_basic ... ok
-2026-01-01T02:42:24.0064165Z test pool_reuses_slots ... ok
-2026-01-01T02:42:24.0064551Z test pooled_returns_to_pool_on_drop ... ok
-2026-01-01T02:42:24.0064843Z 
-2026-01-01T02:42:24.0065214Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:24.0065746Z 
-2026-01-01T02:42:24.0084678Z      Running tests\regressions.rs (target\debug\deps\regressions-145bf9884b95383e.exe)
-2026-01-01T02:42:24.0185438Z 
-2026-01-01T02:42:24.0185761Z running 3 tests
-2026-01-01T02:42:24.0196804Z test panic_during_scope_does_not_corrupt_arena ... ok
-2026-01-01T02:42:24.0232043Z test lockfree_multithread_race_regression ... ok
-2026-01-01T02:42:24.0308431Z test virtual_memory_reset_does_not_leak_committed_pages ... ok
-2026-01-01T02:42:24.0308866Z 
-2026-01-01T02:42:24.0309230Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-2026-01-01T02:42:24.0309737Z 
-2026-01-01T02:42:24.0338718Z      Running tests\sync_arena_basic.rs (target\debug\deps\sync_arena_basic-4bac848897ada313.exe)
-2026-01-01T02:42:24.0435782Z 
-2026-01-01T02:42:24.0435988Z running 1 test
-2026-01-01T02:42:24.0460324Z test sync_arena_multithread_basic ... ok
-2026-01-01T02:42:24.0460638Z 
-2026-01-01T02:42:24.0460966Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:24.0461275Z 
-2026-01-01T02:42:24.0477957Z      Running tests\thread_local.rs (target\debug\deps\thread_local-7956fbf56b01f314.exe)
-2026-01-01T02:42:24.0576177Z 
-2026-01-01T02:42:24.0576644Z running 7 tests
-2026-01-01T02:42:24.0586317Z test test_regular_arena_without_thread_local ... ok
-2026-01-01T02:42:24.0586877Z test test_thread_local_basic_allocation ... ok
-2026-01-01T02:42:24.0587736Z test test_thread_local_mixed_sizes ... ok
-2026-01-01T02:42:24.0589255Z test test_thread_local_large_allocations ... ok
-2026-01-01T02:42:24.0591748Z test test_thread_local_multi_thread ... ok
-2026-01-01T02:42:24.0592342Z test test_thread_local_reset ... ok
-2026-01-01T02:42:24.0593186Z test test_thread_local_with_checkpoints ... ok
-2026-01-01T02:42:24.0593818Z 
-2026-01-01T02:42:24.0594054Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:24.0594352Z 
-2026-01-01T02:42:24.0613698Z      Running tests\v0_5_integration.rs (target\debug\deps\v0_5_integration-48e12869a28b8e14.exe)
-2026-01-01T02:42:24.0711405Z 
-2026-01-01T02:42:24.0712005Z running 4 tests
-2026-01-01T02:42:24.0723808Z test test_checkpoint_stack_with_all_features ... ok
-2026-01-01T02:42:24.0737408Z test test_nested_checkpoints_with_all_features ... ok
-2026-01-01T02:42:24.0743023Z test test_all_features_integration ... ok
-2026-01-01T02:42:24.0743540Z test test_mixed_allocation_sizes_with_all_features ... ok
-2026-01-01T02:42:24.0743790Z 
-2026-01-01T02:42:24.0744019Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:24.0744309Z 
-2026-01-01T02:42:24.0763568Z      Running tests\v0_8_features.rs (target\debug\deps\v0_8_features-ee18e4caaa7c147e.exe)
-2026-01-01T02:42:24.0862511Z 
-2026-01-01T02:42:24.0862905Z running 15 tests
-2026-01-01T02:42:24.0869564Z test lockfree_pool_tests::test_lockfree_allocator_default ... ok
-2026-01-01T02:42:24.0870511Z test lockfree_pool_tests::test_lockfree_allocator_cache_hit_rate ... ok
-2026-01-01T02:42:24.0871376Z test lockfree_pool_tests::test_lockfree_allocator_enable_disable ... ok
-2026-01-01T02:42:24.0872171Z test debug_stats_tests::test_debug_stats_has_leak_reports ... ok
-2026-01-01T02:42:24.0876052Z test lockfree_pool_tests::test_lockfree_allocator_size_limit ... ok
-2026-01-01T02:42:24.0877033Z test lockfree_pool_tests::test_lockfree_pool_basic ... ok
-2026-01-01T02:42:24.0880124Z test lockfree_pool_tests::test_lockfree_pool_stats ... ok
-2026-01-01T02:42:24.0880922Z test lockfree_pool_tests::test_lockfree_pool_default ... ok
-2026-01-01T02:42:24.0882539Z test lockfree_pool_tests::test_lockfree_pool_with_struct ... ok
-2026-01-01T02:42:24.0883436Z test lockfree_pool_tests::test_lockfree_stats_cache_hit_rate ... ok
-2026-01-01T02:42:24.0885650Z test lockfree_pool_tests::test_lockfree_stats_clone ... ok
-2026-01-01T02:42:24.0886492Z test lockfree_pool_tests::test_lockfree_stats_default ... ok
-2026-01-01T02:42:24.0887321Z test lockfree_pool_tests::test_thread_slab_basic ... ok
-2026-01-01T02:42:24.0887911Z test lockfree_pool_tests::test_thread_slab_default ... ok
-2026-01-01T02:42:24.0889043Z test thread_local_tests::test_thread_cache_functions_exist ... ok
-2026-01-01T02:42:24.0889466Z 
-2026-01-01T02:42:24.0889838Z test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:24.0890376Z 
-2026-01-01T02:42:24.0913002Z      Running tests\virtual_memory.rs (target\debug\deps\virtual_memory-8b3cd9c49e9c5054.exe)
-2026-01-01T02:42:24.1015858Z 
-2026-01-01T02:42:24.1016297Z running 5 tests
-2026-01-01T02:42:24.1023723Z test test_regular_arena_still_works ... ok
-2026-01-01T02:42:24.1024465Z test test_virtual_memory_creation ... ok
-2026-01-01T02:42:24.1028600Z test test_virtual_memory_with_checkpoints ... ok
-2026-01-01T02:42:24.1029035Z test test_virtual_memory_reset ... ok
-2026-01-01T02:42:24.1043146Z test test_virtual_memory_large_allocations ... ok
-2026-01-01T02:42:24.1043857Z 
-2026-01-01T02:42:24.1044227Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:24.1044771Z 
-2026-01-01T02:42:24.1063368Z    Doc-tests arena_b
-2026-01-01T02:42:24.6585467Z 
-2026-01-01T02:42:24.6585866Z running 1 test
-2026-01-01T02:42:24.7156509Z test src\arena.rs - arena::Arena::check_valid (line 829) - compile ... ok
-2026-01-01T02:42:24.7156819Z 
-2026-01-01T02:42:24.7157396Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
-2026-01-01T02:42:24.7157718Z 
-2026-01-01T02:42:24.9223401Z    Compiling arena-b v1.0.0 (D:\a\arena-b\arena-b)
-2026-01-01T02:42:29.2342950Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 4.42s
-2026-01-01T02:42:29.2427152Z      Running unittests src\lib.rs (target\debug\deps\arena_b-22dd96a7b2c1e930.exe)
-2026-01-01T02:42:29.2534206Z 
-2026-01-01T02:42:29.2534651Z running 0 tests
-2026-01-01T02:42:29.2534921Z 
-2026-01-01T02:42:29.2535352Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.2535909Z 
-2026-01-01T02:42:29.2552667Z      Running tests\arena_basic.rs (target\debug\deps\arena_basic-b64c6c9161fb0feb.exe)
-2026-01-01T02:42:29.2645904Z 
-2026-01-01T02:42:29.2646233Z running 7 tests
-2026-01-01T02:42:29.2652901Z test alloc_slice_copy_zero_len ... ok
-2026-01-01T02:42:29.2655091Z test alloc_slice_copy_basic ... ok
-2026-01-01T02:42:29.2656158Z test alloc_basic ... ok
-2026-01-01T02:42:29.2657124Z test alloc_slice_uninit_zero_len ... ok
-2026-01-01T02:42:29.2657749Z test alloc_str_basic ... ok
-2026-01-01T02:42:29.2658150Z test reset_allows_reuse ... ok
-2026-01-01T02:42:29.2659120Z test zst_allocation_does_not_consume_space ... ok
-2026-01-01T02:42:29.2659428Z 
-2026-01-01T02:42:29.2660217Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.2660550Z 
-2026-01-01T02:42:29.2677281Z      Running tests\arena_builder_tests.rs (target\debug\deps\arena_builder_tests-8d0cc6ef479fe647.exe)
-2026-01-01T02:42:29.2773225Z 
-2026-01-01T02:42:29.2773724Z running 5 tests
-2026-01-01T02:42:29.2782085Z test tests::test_arena_builder_feature_bundles ... ok
-2026-01-01T02:42:29.2783610Z test tests::test_arena_builder_basic ... ok
-2026-01-01T02:42:29.2784191Z test tests::test_arena_builder_diagnostics ... ok
-2026-01-01T02:42:29.2784746Z test tests::test_arena_builder_individual_features ... ok
-2026-01-01T02:42:29.2785649Z test tests::test_reset_and_shrink_to_fit ... ok
-2026-01-01T02:42:29.2785974Z 
-2026-01-01T02:42:29.2786305Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.2786766Z 
-2026-01-01T02:42:29.2803908Z      Running tests\arena_props.rs (target\debug\deps\arena_props-795d6be7b117c605.exe)
-2026-01-01T02:42:29.2897297Z 
-2026-01-01T02:42:29.2897523Z running 2 tests
-2026-01-01T02:42:29.3114628Z test reset_frees_all_memory ... ok
-2026-01-01T02:42:29.3367620Z test alloc_slice_copy_roundtrip ... ok
-2026-01-01T02:42:29.3367931Z 
-2026-01-01T02:42:29.3368171Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
-2026-01-01T02:42:29.3368851Z 
-2026-01-01T02:42:29.3391192Z      Running tests\chunk_usage.rs (target\debug\deps\chunk_usage-3282d741f0e263ec.exe)
-2026-01-01T02:42:29.3491815Z 
-2026-01-01T02:42:29.3492205Z running 1 test
-2026-01-01T02:42:29.3506394Z test chunk_usage_reports_used_and_capacity ... ok
-2026-01-01T02:42:29.3506854Z 
-2026-01-01T02:42:29.3507086Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.3507379Z 
-2026-01-01T02:42:29.3526224Z      Running tests\fast_reset_api.rs (target\debug\deps\fast_reset_api-c4c80bc5ff5406f9.exe)
-2026-01-01T02:42:29.3624050Z 
-2026-01-01T02:42:29.3624401Z running 7 tests
-2026-01-01T02:42:29.3633423Z test test_checkpoint_basic ... ok
-2026-01-01T02:42:29.3633881Z test test_checkpoint_with_stats ... ok
-2026-01-01T02:42:29.3634332Z test test_checkpoint_stack ... ok
-2026-01-01T02:42:29.3636366Z test test_clear_checkpoints ... ok
-2026-01-01T02:42:29.3637702Z test test_frame_based_pattern ... ok
-2026-01-01T02:42:29.3638305Z test test_reset_clears_checkpoints ... ok
-2026-01-01T02:42:29.3640134Z test test_multiple_chunks ... ok
-2026-01-01T02:42:29.3640676Z 
-2026-01-01T02:42:29.3640999Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.3641328Z 
-2026-01-01T02:42:29.3660110Z      Running tests\lockfree.rs (target\debug\deps\lockfree-2e580ab499c1d97e.exe)
-2026-01-01T02:42:29.3750805Z 
-2026-01-01T02:42:29.3751035Z running 1 test
-2026-01-01T02:42:29.3755412Z test test_regular_arena_without_lockfree ... ok
-2026-01-01T02:42:29.3755738Z 
-2026-01-01T02:42:29.3756042Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.3756344Z 
-2026-01-01T02:42:29.3772664Z      Running tests\memory_safety.rs (target\debug\deps\memory_safety-f1ea05e9d29b591d.exe)
-2026-01-01T02:42:29.3867958Z 
-2026-01-01T02:42:29.3868296Z running 1 test
-2026-01-01T02:42:29.3873208Z test test_debug_feature_compiles ... ok
-2026-01-01T02:42:29.3873546Z 
-2026-01-01T02:42:29.3873929Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.3874469Z 
-2026-01-01T02:42:29.3892109Z      Running tests\memory_safety_simple.rs (target\debug\deps\memory_safety_simple-a51b4142993a43a4.exe)
-2026-01-01T02:42:29.3987568Z 
-2026-01-01T02:42:29.3987753Z running 1 test
-2026-01-01T02:42:29.3992101Z test test_debug_feature_compiles ... ok
-2026-01-01T02:42:29.3992407Z 
-2026-01-01T02:42:29.3992712Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.3993028Z 
-2026-01-01T02:42:29.4009294Z      Running tests\pool_basic.rs (target\debug\deps\pool_basic-03d9e723436a963d.exe)
-2026-01-01T02:42:29.4102259Z 
-2026-01-01T02:42:29.4102604Z running 3 tests
-2026-01-01T02:42:29.4107964Z test pool_alloc_basic ... ok
-2026-01-01T02:42:29.4108355Z test pool_reuses_slots ... ok
-2026-01-01T02:42:29.4108740Z test pooled_returns_to_pool_on_drop ... ok
-2026-01-01T02:42:29.4109027Z 
-2026-01-01T02:42:29.4109345Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.4109637Z 
-2026-01-01T02:42:29.4126787Z      Running tests\regressions.rs (target\debug\deps\regressions-c9a30d491c6005d2.exe)
-2026-01-01T02:42:29.4219969Z 
-2026-01-01T02:42:29.4220303Z running 2 tests
-2026-01-01T02:42:29.4227327Z test panic_during_scope_does_not_corrupt_arena ... ok
-2026-01-01T02:42:29.4328745Z test virtual_memory_reset_does_not_leak_committed_pages ... ok
-2026-01-01T02:42:29.4329102Z 
-2026-01-01T02:42:29.4329320Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-2026-01-01T02:42:29.4329627Z 
-2026-01-01T02:42:29.4358179Z      Running tests\sync_arena_basic.rs (target\debug\deps\sync_arena_basic-3ce60526e0d72151.exe)
-2026-01-01T02:42:29.4457914Z 
-2026-01-01T02:42:29.4458251Z running 0 tests
-2026-01-01T02:42:29.4458858Z 
-2026-01-01T02:42:29.4459094Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.4459392Z 
-2026-01-01T02:42:29.4475984Z      Running tests\thread_local.rs (target\debug\deps\thread_local-96f59a18a21cb55c.exe)
-2026-01-01T02:42:29.4570939Z 
-2026-01-01T02:42:29.4571160Z running 7 tests
-2026-01-01T02:42:29.4582125Z test test_thread_local_basic_allocation ... ok
-2026-01-01T02:42:29.4582786Z test test_thread_local_large_allocations ... ok
-2026-01-01T02:42:29.4583964Z test test_regular_arena_without_thread_local ... ok
-2026-01-01T02:42:29.4584686Z test test_thread_local_mixed_sizes ... ok
-2026-01-01T02:42:29.4587983Z test test_thread_local_multi_thread ... ok
-2026-01-01T02:42:29.4590532Z test test_thread_local_with_checkpoints ... ok
-2026-01-01T02:42:29.4591397Z test test_thread_local_reset ... ok
-2026-01-01T02:42:29.4591671Z 
-2026-01-01T02:42:29.4592621Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.4593200Z 
-2026-01-01T02:42:29.4608654Z      Running tests\v0_5_integration.rs (target\debug\deps\v0_5_integration-99252fa9c533eaeb.exe)
-2026-01-01T02:42:29.4699972Z 
-2026-01-01T02:42:29.4700298Z running 1 test
-2026-01-01T02:42:29.4703479Z test test_feature_combination_note ... ok
-2026-01-01T02:42:29.4703789Z 
-2026-01-01T02:42:29.4704315Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.4704628Z 
-2026-01-01T02:42:29.4720465Z      Running tests\v0_8_features.rs (target\debug\deps\v0_8_features-7d75205a4e8149bb.exe)
-2026-01-01T02:42:29.4812963Z 
-2026-01-01T02:42:29.4813311Z running 2 tests
-2026-01-01T02:42:29.4818190Z test thread_local_tests::test_thread_cache_functions_exist ... ok
-2026-01-01T02:42:29.4819164Z test debug_stats_tests::test_debug_stats_has_leak_reports ... ok
-2026-01-01T02:42:29.4819561Z 
-2026-01-01T02:42:29.4819928Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.4820482Z 
-2026-01-01T02:42:29.4837115Z      Running tests\virtual_memory.rs (target\debug\deps\virtual_memory-1daf5c716194ffe8.exe)
-2026-01-01T02:42:29.4933700Z 
-2026-01-01T02:42:29.4934055Z running 5 tests
-2026-01-01T02:42:29.4941787Z test test_regular_arena_still_works ... ok
-2026-01-01T02:42:29.4942707Z test test_virtual_memory_creation ... ok
-2026-01-01T02:42:29.4946244Z test test_virtual_memory_with_checkpoints ... ok
-2026-01-01T02:42:29.4950562Z test test_virtual_memory_reset ... ok
-2026-01-01T02:42:29.4972680Z test test_virtual_memory_large_allocations ... ok
-2026-01-01T02:42:29.4973389Z 
-2026-01-01T02:42:29.4973786Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-2026-01-01T02:42:29.4974321Z 
-2026-01-01T02:42:29.4989086Z    Doc-tests arena_b
-2026-01-01T02:42:29.5843085Z 
-2026-01-01T02:42:29.5843956Z running 1 test
-2026-01-01T02:42:29.6332611Z test src\arena.rs - arena::Arena::check_valid (line 829) - compile ... ok
-2026-01-01T02:42:29.6332984Z 
-2026-01-01T02:42:29.6333217Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
-2026-01-01T02:42:29.6333551Z 
-2026-01-01T02:42:29.7738965Z ##[group]Run cargo test --no-default-features --tests
-2026-01-01T02:42:29.7739469Z [36;1mcargo test --no-default-features --tests[0m
-2026-01-01T02:42:29.7822975Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
-2026-01-01T02:42:29.7823301Z ##[endgroup]
-2026-01-01T02:42:30.2324616Z    Compiling arena-b v1.0.0 (D:\a\arena-b\arena-b)
-2026-01-01T02:42:30.4192172Z warning: unnecessary `unsafe` block
-2026-01-01T02:42:30.4192940Z    --> src\core.rs:614:9
-2026-01-01T02:42:30.4193476Z     |
-2026-01-01T02:42:30.4193930Z 614 |         unsafe {
-2026-01-01T02:42:30.4194432Z     |         ^^^^^^ unnecessary `unsafe` block
-2026-01-01T02:42:30.4194963Z     |
-2026-01-01T02:42:30.4195511Z     = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
-2026-01-01T02:42:30.4196472Z 
-2026-01-01T02:42:30.6383018Z warning: `arena-b` (lib test) generated 1 warning (1 duplicate)
-2026-01-01T02:42:30.7213436Z warning: `arena-b` (lib) generated 1 warning
-2026-01-01T02:42:30.9918153Z error[E0599]: no method named `pop_and_rewind` found for struct `Arena` in the current scope
-2026-01-01T02:42:30.9934435Z   --> tests\fast_reset_api.rs:53:34
-2026-01-01T02:42:30.9937595Z    |
-2026-01-01T02:42:30.9938181Z 53 |     let _popped = unsafe { arena.pop_and_rewind() };
-2026-01-01T02:42:30.9939988Z    |                                  ^^^^^^^^^^^^^^ method not found in `Arena`
-2026-01-01T02:42:30.9988263Z 
-2026-01-01T02:42:31.0073590Z error[E0599]: no method named `alloc_batch` found for struct `Arena` in the current scope
-2026-01-01T02:42:31.0075747Z   --> tests\fast_reset_api.rs:79:30
-2026-01-01T02:42:31.0181745Z    |
-2026-01-01T02:42:31.0183634Z 79 |         let entities = arena.alloc_batch(&frame_data);
-2026-01-01T02:42:31.0278261Z    |                              ^^^^^^^^^^^
-2026-01-01T02:42:31.0282935Z    |
-2026-01-01T02:42:31.0285021Z help: there is a method `alloc_str` with a similar name
-2026-01-01T02:42:31.0368703Z    |
-2026-01-01T02:42:31.0391711Z 79 -         let entities = arena.alloc_batch(&frame_data);
-2026-01-01T02:42:31.0418927Z 79 +         let entities = arena.alloc_str(&frame_data);
-2026-01-01T02:42:31.0419623Z    |
-2026-01-01T02:42:31.0419913Z 
-2026-01-01T02:42:31.0420359Z warning: unnecessary `unsafe` block
-2026-01-01T02:42:31.0420915Z    --> tests\fast_reset_api.rs:171:5
-2026-01-01T02:42:31.0421417Z     |
-2026-01-01T02:42:31.0421810Z 171 |     unsafe {
-2026-01-01T02:42:31.0423127Z     |     ^^^^^^ unnecessary `unsafe` block
-2026-01-01T02:42:31.0423730Z     |
-2026-01-01T02:42:31.0424302Z     = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
-2026-01-01T02:42:31.0424940Z 
-2026-01-01T02:42:31.0527305Z warning: variable does not need to be mutable
-2026-01-01T02:42:31.0530113Z    --> tests\fast_reset_api.rs:163:9
-2026-01-01T02:42:31.0535556Z     |
-2026-01-01T02:42:31.0537270Z 163 |     let mut arena = Arena::new();
-2026-01-01T02:42:31.0540721Z     |         ----^^^^^
-2026-01-01T02:42:31.0552096Z     |         |
-2026-01-01T02:42:31.0556607Z     |         help: remove this `mut`
-2026-01-01T02:42:31.0557208Z     |
-2026-01-01T02:42:31.0557723Z     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
-2026-01-01T02:42:31.0558265Z 
-2026-01-01T02:42:31.0697942Z For more information about this error, try `rustc --explain E0599`.
-2026-01-01T02:42:31.0870307Z warning: `arena-b` (test "fast_reset_api") generated 2 warnings
-2026-01-01T02:42:31.0872985Z error: could not compile `arena-b` (test "fast_reset_api") due to 2 previous errors; 2 warnings emitted
-2026-01-01T02:42:31.0874848Z warning: build failed, waiting for other jobs to finish...
-2026-01-01T02:42:31.1007294Z warning: unnecessary `unsafe` block
-2026-01-01T02:42:31.1009408Z   --> tests\arena_basic.rs:32:5
-2026-01-01T02:42:31.1010313Z    |
-2026-01-01T02:42:31.1017365Z 32 |     unsafe {
-2026-01-01T02:42:31.1036127Z    |     ^^^^^^ unnecessary `unsafe` block
-2026-01-01T02:42:31.1038606Z    |
-2026-01-01T02:42:31.1056860Z    = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
-2026-01-01T02:42:31.1058037Z 
-2026-01-01T02:42:31.1058615Z warning: variable does not need to be mutable
-2026-01-01T02:42:31.1059287Z   --> tests\arena_basic.rs:29:9
-2026-01-01T02:42:31.1060011Z    |
-2026-01-01T02:42:31.1077678Z 29 |     let mut arena = Arena::with_capacity(128);
-2026-01-01T02:42:31.1078418Z    |         ----^^^^^
-2026-01-01T02:42:31.1078861Z    |         |
-2026-01-01T02:42:31.1079282Z    |         help: remove this `mut`
-2026-01-01T02:42:31.1079775Z    |
-2026-01-01T02:42:31.1080281Z    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
-2026-01-01T02:42:31.1080834Z 
-2026-01-01T02:42:31.3835757Z warning: `arena-b` (test "arena_basic") generated 2 warnings (run `cargo fix --test "arena_basic" -p arena-b` to apply 1 suggestion)
-2026-01-01T02:42:31.5333435Z ##[error]Process completed with exit code 1.
-2026-01-01T02:42:31.5551128Z Post job cleanup.
-2026-01-01T02:42:31.7969339Z [command]"C:\Program Files\Git\bin\git.exe" version
-2026-01-01T02:42:31.8251785Z git version 2.52.0.windows.1
-2026-01-01T02:42:31.8329558Z Temporarily overriding HOME='D:\a\_temp\9879a48b-4ba6-473f-8f0e-8fc39a45d5ad' before making global git config changes
-2026-01-01T02:42:31.8330286Z Adding repository directory to the temporary git global config as a safe directory
-2026-01-01T02:42:31.8340798Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\arena-b\arena-b
-2026-01-01T02:42:31.8690110Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
-2026-01-01T02:42:31.9019177Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
-2026-01-01T02:42:32.4524293Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
-2026-01-01T02:42:32.4789712Z http.https://github.com/.extraheader
-2026-01-01T02:42:32.4839007Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
-2026-01-01T02:42:32.5166743Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
-2026-01-01T02:42:33.0645764Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
-2026-01-01T02:42:33.0971367Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
-2026-01-01T02:42:33.6753250Z Cleaning up orphan processes
-2026-01-01T02:42:33.7210941Z Terminate orphan process: pid (9276) (vctip)
+2026-01-01T02:46:23.0313889Z Current runner version: '2.330.0'
+2026-01-01T02:46:23.0352806Z ##[group]Runner Image Provisioner
+2026-01-01T02:46:23.0354068Z Hosted Compute Agent
+2026-01-01T02:46:23.0355072Z Version: 20251211.462
+2026-01-01T02:46:23.0355962Z Commit: 6cbad8c2bb55d58165063d031ccabf57e2d2db61
+2026-01-01T02:46:23.0357207Z Build Date: 2025-12-11T16:28:49Z
+2026-01-01T02:46:23.0358342Z Worker ID: {5a688b96-09b4-49fb-926d-1274c0ce7d55}
+2026-01-01T02:46:23.0359358Z ##[endgroup]
+2026-01-01T02:46:23.0360174Z ##[group]Operating System
+2026-01-01T02:46:23.0361097Z Microsoft Windows Server 2025
+2026-01-01T02:46:23.0362138Z 10.0.26100
+2026-01-01T02:46:23.0362865Z Datacenter
+2026-01-01T02:46:23.0363632Z ##[endgroup]
+2026-01-01T02:46:23.0364361Z ##[group]Runner Image
+2026-01-01T02:46:23.0365224Z Image: windows-2025
+2026-01-01T02:46:23.0367213Z Version: 20251216.149.1
+2026-01-01T02:46:23.0370459Z Included Software: https://github.com/actions/runner-images/blob/win25/20251216.149/images/windows/Windows2025-Readme.md
+2026-01-01T02:46:23.0373122Z Image Release: https://github.com/actions/runner-images/releases/tag/win25%2F20251216.149
+2026-01-01T02:46:23.0374638Z ##[endgroup]
+2026-01-01T02:46:23.0376694Z ##[group]GITHUB_TOKEN Permissions
+2026-01-01T02:46:23.0379885Z Contents: read
+2026-01-01T02:46:23.0380644Z Metadata: read
+2026-01-01T02:46:23.0381328Z Packages: read
+2026-01-01T02:46:23.0381869Z ##[endgroup]
+2026-01-01T02:46:23.0384073Z Secret source: Actions
+2026-01-01T02:46:23.0384819Z Prepare workflow directory
+2026-01-01T02:46:23.0837198Z Prepare all required actions
+2026-01-01T02:46:23.0880468Z Getting action download info
+2026-01-01T02:46:23.2566591Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-01-01T02:46:23.5167194Z Complete job name: build-test (windows-latest, stable)
+2026-01-01T02:46:23.6722771Z ##[group]Run actions/checkout@v4
+2026-01-01T02:46:23.6723883Z with:
+2026-01-01T02:46:23.6724241Z   repository: M1tsumi/arena-b
+2026-01-01T02:46:23.6724902Z   token: ***
+2026-01-01T02:46:23.6725269Z   ssh-strict: true
+2026-01-01T02:46:23.6725625Z   ssh-user: git
+2026-01-01T02:46:23.6725991Z   persist-credentials: true
+2026-01-01T02:46:23.6726382Z   clean: true
+2026-01-01T02:46:23.6726736Z   sparse-checkout-cone-mode: true
+2026-01-01T02:46:23.6727166Z   fetch-depth: 1
+2026-01-01T02:46:23.6727517Z   fetch-tags: false
+2026-01-01T02:46:23.6727868Z   show-progress: true
+2026-01-01T02:46:23.6728234Z   lfs: false
+2026-01-01T02:46:23.6728557Z   submodules: false
+2026-01-01T02:46:23.6728916Z   set-safe-directory: true
+2026-01-01T02:46:23.6729523Z ##[endgroup]
+2026-01-01T02:46:23.8495715Z Syncing repository: M1tsumi/arena-b
+2026-01-01T02:46:23.8497847Z ##[group]Getting Git version info
+2026-01-01T02:46:23.8498471Z Working directory is 'D:\a\arena-b\arena-b'
+2026-01-01T02:46:23.9515539Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-01-01T02:46:24.2949236Z git version 2.52.0.windows.1
+2026-01-01T02:46:24.3003711Z ##[endgroup]
+2026-01-01T02:46:24.3026706Z Temporarily overriding HOME='D:\a\_temp\a8cb6337-d3cd-4093-83e4-4da78cf392fd' before making global git config changes
+2026-01-01T02:46:24.3028204Z Adding repository directory to the temporary git global config as a safe directory
+2026-01-01T02:46:24.3038869Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\arena-b\arena-b
+2026-01-01T02:46:24.3622706Z Deleting the contents of 'D:\a\arena-b\arena-b'
+2026-01-01T02:46:24.3630242Z ##[group]Initializing the repository
+2026-01-01T02:46:24.3640783Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\arena-b\arena-b
+2026-01-01T02:46:24.4499415Z Initialized empty Git repository in D:/a/arena-b/arena-b/.git/
+2026-01-01T02:46:24.4548850Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/M1tsumi/arena-b
+2026-01-01T02:46:24.5136386Z ##[endgroup]
+2026-01-01T02:46:24.5137287Z ##[group]Disabling automatic garbage collection
+2026-01-01T02:46:24.5138191Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-01-01T02:46:24.5487306Z ##[endgroup]
+2026-01-01T02:46:24.5488250Z ##[group]Setting up auth
+2026-01-01T02:46:24.5502950Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-01-01T02:46:24.5864468Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-01-01T02:46:26.0201616Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-01-01T02:46:26.0523274Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-01-01T02:46:26.6140059Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-01-01T02:46:26.6499684Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-01-01T02:46:27.2251458Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-01-01T02:46:27.2583224Z ##[endgroup]
+2026-01-01T02:46:27.2583837Z ##[group]Fetching the repository
+2026-01-01T02:46:27.2596715Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4eb92bdd64ce248780e326771147338dec9f54f2:refs/remotes/pull/9/merge
+2026-01-01T02:46:28.2186656Z From https://github.com/M1tsumi/arena-b
+2026-01-01T02:46:28.2518930Z  * [new ref]         4eb92bdd64ce248780e326771147338dec9f54f2 -> pull/9/merge
+2026-01-01T02:46:28.2520900Z ##[endgroup]
+2026-01-01T02:46:28.2521432Z ##[group]Determining the checkout info
+2026-01-01T02:46:28.2522070Z ##[endgroup]
+2026-01-01T02:46:28.2531377Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-01-01T02:46:28.3001318Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-01-01T02:46:28.3311886Z ##[group]Checking out the ref
+2026-01-01T02:46:28.3322258Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force refs/remotes/pull/9/merge
+2026-01-01T02:46:28.4135786Z Note: switching to 'refs/remotes/pull/9/merge'.
+2026-01-01T02:46:28.4136261Z 
+2026-01-01T02:46:28.4136571Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-01-01T02:46:28.4137233Z changes and commit them, and you can discard any commits you make in this
+2026-01-01T02:46:28.4138346Z state without impacting any branches by switching back to a branch.
+2026-01-01T02:46:28.4139653Z 
+2026-01-01T02:46:28.4139855Z If you want to create a new branch to retain commits you create, you may
+2026-01-01T02:46:28.4140275Z do so (now or later) by using -c with the switch command. Example:
+2026-01-01T02:46:28.4140540Z 
+2026-01-01T02:46:28.4140660Z   git switch -c <new-branch-name>
+2026-01-01T02:46:28.4141056Z 
+2026-01-01T02:46:28.4141154Z Or undo this operation with:
+2026-01-01T02:46:28.4141313Z 
+2026-01-01T02:46:28.4141430Z   git switch -
+2026-01-01T02:46:28.4141557Z 
+2026-01-01T02:46:28.4141787Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-01-01T02:46:28.4142054Z 
+2026-01-01T02:46:28.4142556Z HEAD is now at 4eb92bd Merge fa0617d16ec46cfa2954df6e2551246e92a4c2a5 into 14cb37d597b51884d274e7e1459d299c5d5aa258
+2026-01-01T02:46:28.4191357Z ##[endgroup]
+2026-01-01T02:46:28.4588294Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-01-01T02:46:28.4905584Z 4eb92bdd64ce248780e326771147338dec9f54f2
+2026-01-01T02:46:28.5379738Z ##[group]Run # On Windows, use the native rustup installer binary instead of the Unix shell script
+2026-01-01T02:46:28.5380576Z [36;1m# On Windows, use the native rustup installer binary instead of the Unix shell script[0m
+2026-01-01T02:46:28.5382062Z [36;1mInvoke-WebRequest -UseBasicParsing https://win.rustup.rs/x86_64 -OutFile rustup-init.exe[0m
+2026-01-01T02:46:28.5382494Z [36;1m./rustup-init.exe -y[0m
+2026-01-01T02:46:28.5382874Z [36;1mecho "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append[0m
+2026-01-01T02:46:28.5383379Z [36;1m& "$env:USERPROFILE\.cargo\bin\rustup.exe" toolchain install "stable"[0m
+2026-01-01T02:46:28.5383849Z [36;1m& "$env:USERPROFILE\.cargo\bin\rustup.exe" component add rustfmt clippy --toolchain "stable"[0m
+2026-01-01T02:46:28.6216623Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-01-01T02:46:28.6217078Z ##[endgroup]
+2026-01-01T02:46:34.8536566Z warn: It looks like you have an existing rustup settings file at:
+2026-01-01T02:46:34.8537376Z warn: C:\Users\runneradmin\.rustup\settings.toml
+2026-01-01T02:46:34.8538103Z warn: Rustup will install the default toolchain as specified in the settings file,
+2026-01-01T02:46:34.8538932Z warn: instead of the one inferred from the default host triple.
+2026-01-01T02:46:35.0852459Z warn: tool `rust-analyzer` is already installed, remove it from `C:\Users\runneradmin\.cargo\bin`, then run `rustup update` to have rustup manage this tool.
+2026-01-01T02:46:35.0853467Z warn: tool `rustfmt` is already installed, remove it from `C:\Users\runneradmin\.cargo\bin`, then run `rustup update` to have rustup manage this tool.
+2026-01-01T02:46:35.0854273Z warn: tool `cargo-fmt` is already installed, remove it from `C:\Users\runneradmin\.cargo\bin`, then run `rustup update` to have rustup manage this tool.
+2026-01-01T02:46:35.2126606Z info: profile set to 'default'
+2026-01-01T02:46:35.2127111Z info: default host triple is x86_64-pc-windows-msvc
+2026-01-01T02:46:35.2134738Z warn: Updating existing toolchain, profile choice will be ignored
+2026-01-01T02:46:44.3345277Z info: syncing channel updates for 'stable-x86_64-pc-windows-msvc'
+2026-01-01T02:46:44.4306182Z info: default toolchain set to 'stable-x86_64-pc-windows-msvc'
+2026-01-01T02:46:44.4306715Z 
+2026-01-01T02:46:44.4517710Z   stable-x86_64-pc-windows-msvc unchanged - rustc 1.92.0 (ded5c06cf 2025-12-08)
+2026-01-01T02:46:44.4518179Z 
+2026-01-01T02:46:44.4518212Z 
+2026-01-01T02:46:44.4523253Z Rust is installed now. Great!
+2026-01-01T02:46:44.4523509Z 
+2026-01-01T02:46:44.4523710Z To get started you may need to restart your current shell.
+2026-01-01T02:46:44.4524281Z This would reload its PATH environment variable to include
+2026-01-01T02:46:44.4524760Z Cargo's bin directory (%USERPROFILE%\.cargo\bin).
+2026-01-01T02:46:44.6310981Z info: syncing channel updates for 'stable-x86_64-pc-windows-msvc'
+2026-01-01T02:46:44.7124014Z 
+2026-01-01T02:46:44.7366081Z   stable-x86_64-pc-windows-msvc unchanged - rustc 1.92.0 (ded5c06cf 2025-12-08)
+2026-01-01T02:46:44.7367354Z 
+2026-01-01T02:46:44.9420087Z info: component 'rustfmt' for target 'x86_64-pc-windows-msvc' is up to date
+2026-01-01T02:46:45.1136782Z info: component 'clippy' for target 'x86_64-pc-windows-msvc' is up to date
+2026-01-01T02:46:45.4889282Z ##[group]Run rustc -Vv
+2026-01-01T02:46:45.4889567Z [36;1mrustc -Vv[0m
+2026-01-01T02:46:45.4889758Z [36;1mrustc --print target-list[0m
+2026-01-01T02:46:45.4969421Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-01-01T02:46:45.4969745Z ##[endgroup]
+2026-01-01T02:46:45.8671573Z rustc 1.92.0 (ded5c06cf 2025-12-08)
+2026-01-01T02:46:45.8672096Z binary: rustc
+2026-01-01T02:46:45.8672340Z commit-hash: ded5c06cf21d2b93bffd5d884aa6e96934ee4234
+2026-01-01T02:46:45.8672615Z commit-date: 2025-12-08
+2026-01-01T02:46:45.8672809Z host: x86_64-pc-windows-msvc
+2026-01-01T02:46:45.8673363Z release: 1.92.0
+2026-01-01T02:46:46.1207970Z LLVM version: 21.1.3
+2026-01-01T02:46:48.6637372Z aarch64-apple-darwin
+2026-01-01T02:46:48.6637864Z aarch64-apple-ios
+2026-01-01T02:46:48.6638156Z aarch64-apple-ios-macabi
+2026-01-01T02:46:48.6638477Z aarch64-apple-ios-sim
+2026-01-01T02:46:48.6639501Z aarch64-apple-tvos
+2026-01-01T02:46:48.6639801Z aarch64-apple-tvos-sim
+2026-01-01T02:46:48.6640219Z aarch64-apple-visionos
+2026-01-01T02:46:48.6640559Z aarch64-apple-visionos-sim
+2026-01-01T02:46:48.6640855Z aarch64-apple-watchos
+2026-01-01T02:46:48.6641112Z aarch64-apple-watchos-sim
+2026-01-01T02:46:48.6641411Z aarch64-kmc-solid_asp3
+2026-01-01T02:46:48.6641668Z aarch64-linux-android
+2026-01-01T02:46:48.6642016Z aarch64-nintendo-switch-freestanding
+2026-01-01T02:46:48.6642452Z aarch64-pc-windows-gnullvm
+2026-01-01T02:46:48.6642796Z aarch64-pc-windows-msvc
+2026-01-01T02:46:48.6643097Z aarch64-unknown-freebsd
+2026-01-01T02:46:48.6643406Z aarch64-unknown-fuchsia
+2026-01-01T02:46:48.6643710Z aarch64-unknown-hermit
+2026-01-01T02:46:48.6643997Z aarch64-unknown-illumos
+2026-01-01T02:46:48.6644309Z aarch64-unknown-linux-gnu
+2026-01-01T02:46:48.6644664Z aarch64-unknown-linux-gnu_ilp32
+2026-01-01T02:46:48.6645032Z aarch64-unknown-linux-musl
+2026-01-01T02:46:48.6645414Z aarch64-unknown-linux-ohos
+2026-01-01T02:46:48.6645790Z aarch64-unknown-managarm-mlibc
+2026-01-01T02:46:48.6646169Z aarch64-unknown-netbsd
+2026-01-01T02:46:48.6646467Z aarch64-unknown-none
+2026-01-01T02:46:48.6646779Z aarch64-unknown-none-softfloat
+2026-01-01T02:46:48.6647121Z aarch64-unknown-nto-qnx700
+2026-01-01T02:46:48.6647706Z aarch64-unknown-nto-qnx710
+2026-01-01T02:46:48.6647931Z aarch64-unknown-nto-qnx710_iosock
+2026-01-01T02:46:48.6648173Z aarch64-unknown-nto-qnx800
+2026-01-01T02:46:48.6648376Z aarch64-unknown-nuttx
+2026-01-01T02:46:48.6648570Z aarch64-unknown-openbsd
+2026-01-01T02:46:48.6648776Z aarch64-unknown-redox
+2026-01-01T02:46:48.6649017Z aarch64-unknown-teeos
+2026-01-01T02:46:48.6649205Z aarch64-unknown-trusty
+2026-01-01T02:46:48.6649393Z aarch64-unknown-uefi
+2026-01-01T02:46:48.6649587Z aarch64-uwp-windows-msvc
+2026-01-01T02:46:48.6649786Z aarch64-wrs-vxworks
+2026-01-01T02:46:48.6650007Z aarch64_be-unknown-hermit
+2026-01-01T02:46:48.6650212Z aarch64_be-unknown-linux-gnu
+2026-01-01T02:46:48.6650453Z aarch64_be-unknown-linux-gnu_ilp32
+2026-01-01T02:46:48.6650702Z aarch64_be-unknown-linux-musl
+2026-01-01T02:46:48.6650978Z aarch64_be-unknown-netbsd
+2026-01-01T02:46:48.6651187Z aarch64_be-unknown-none-softfloat
+2026-01-01T02:46:48.6651418Z amdgcn-amd-amdhsa
+2026-01-01T02:46:48.6651598Z arm-linux-androideabi
+2026-01-01T02:46:48.6651799Z arm-unknown-linux-gnueabi
+2026-01-01T02:46:48.6652027Z arm-unknown-linux-gnueabihf
+2026-01-01T02:46:48.6652245Z arm-unknown-linux-musleabi
+2026-01-01T02:46:48.6652467Z arm-unknown-linux-musleabihf
+2026-01-01T02:46:48.6652681Z arm64_32-apple-watchos
+2026-01-01T02:46:48.6652871Z arm64e-apple-darwin
+2026-01-01T02:46:48.6653046Z arm64e-apple-ios
+2026-01-01T02:46:48.6653219Z arm64e-apple-tvos
+2026-01-01T02:46:48.6653396Z arm64ec-pc-windows-msvc
+2026-01-01T02:46:48.6653610Z armeb-unknown-linux-gnueabi
+2026-01-01T02:46:48.6653816Z armebv7r-none-eabi
+2026-01-01T02:46:48.6653998Z armebv7r-none-eabihf
+2026-01-01T02:46:48.6654172Z armv4t-none-eabi
+2026-01-01T02:46:48.6654370Z armv4t-unknown-linux-gnueabi
+2026-01-01T02:46:48.6656833Z armv5te-none-eabi
+2026-01-01T02:46:48.6657078Z armv5te-unknown-linux-gnueabi
+2026-01-01T02:46:48.6657300Z armv5te-unknown-linux-musleabi
+2026-01-01T02:46:48.6720124Z armv5te-unknown-linux-uclibceabi
+2026-01-01T02:46:48.6720415Z armv6-unknown-freebsd
+2026-01-01T02:46:48.6720606Z armv6-unknown-netbsd-eabihf
+2026-01-01T02:46:48.6720807Z armv6k-nintendo-3ds
+2026-01-01T02:46:48.6720975Z armv7-linux-androideabi
+2026-01-01T02:46:48.6721153Z armv7-rtems-eabihf
+2026-01-01T02:46:48.6721390Z armv7-sony-vita-newlibeabihf
+2026-01-01T02:46:48.6721593Z armv7-unknown-freebsd
+2026-01-01T02:46:48.6721777Z armv7-unknown-linux-gnueabi
+2026-01-01T02:46:48.6721972Z armv7-unknown-linux-gnueabihf
+2026-01-01T02:46:48.6722182Z armv7-unknown-linux-musleabi
+2026-01-01T02:46:48.6722380Z armv7-unknown-linux-musleabihf
+2026-01-01T02:46:48.6722595Z armv7-unknown-linux-ohos
+2026-01-01T02:46:48.6722783Z armv7-unknown-linux-uclibceabi
+2026-01-01T02:46:48.6723473Z armv7-unknown-linux-uclibceabihf
+2026-01-01T02:46:48.6723696Z armv7-unknown-netbsd-eabihf
+2026-01-01T02:46:48.6723887Z armv7-unknown-trusty
+2026-01-01T02:46:48.6724056Z armv7-wrs-vxworks-eabihf
+2026-01-01T02:46:48.6724249Z armv7a-kmc-solid_asp3-eabi
+2026-01-01T02:46:48.6724432Z armv7a-kmc-solid_asp3-eabihf
+2026-01-01T02:46:48.6724612Z armv7a-none-eabi
+2026-01-01T02:46:48.6724768Z armv7a-none-eabihf
+2026-01-01T02:46:48.6724921Z armv7a-nuttx-eabi
+2026-01-01T02:46:48.6725079Z armv7a-nuttx-eabihf
+2026-01-01T02:46:48.6725226Z armv7a-vex-v5
+2026-01-01T02:46:48.6725381Z armv7k-apple-watchos
+2026-01-01T02:46:48.6725538Z armv7r-none-eabi
+2026-01-01T02:46:48.6726130Z armv7r-none-eabihf
+2026-01-01T02:46:48.6726365Z armv7s-apple-ios
+2026-01-01T02:46:48.6726531Z armv8r-none-eabihf
+2026-01-01T02:46:48.6726676Z avr-none
+2026-01-01T02:46:48.6726819Z bpfeb-unknown-none
+2026-01-01T02:46:48.6726969Z bpfel-unknown-none
+2026-01-01T02:46:48.6727173Z csky-unknown-linux-gnuabiv2
+2026-01-01T02:46:48.6727387Z csky-unknown-linux-gnuabiv2hf
+2026-01-01T02:46:48.6727592Z hexagon-unknown-linux-musl
+2026-01-01T02:46:48.6727784Z hexagon-unknown-none-elf
+2026-01-01T02:46:48.6727950Z i386-apple-ios
+2026-01-01T02:46:48.6728104Z i586-unknown-linux-gnu
+2026-01-01T02:46:48.6728267Z i586-unknown-linux-musl
+2026-01-01T02:46:48.6728442Z i586-unknown-netbsd
+2026-01-01T02:46:48.6728595Z i586-unknown-redox
+2026-01-01T02:46:48.6728739Z i686-apple-darwin
+2026-01-01T02:46:48.6728891Z i686-linux-android
+2026-01-01T02:46:48.6729038Z i686-pc-nto-qnx700
+2026-01-01T02:46:48.6729193Z i686-pc-windows-gnu
+2026-01-01T02:46:48.6729349Z i686-pc-windows-gnullvm
+2026-01-01T02:46:48.6729517Z i686-pc-windows-msvc
+2026-01-01T02:46:48.6729675Z i686-unknown-freebsd
+2026-01-01T02:46:48.6729825Z i686-unknown-haiku
+2026-01-01T02:46:48.6729972Z i686-unknown-hurd-gnu
+2026-01-01T02:46:48.6730135Z i686-unknown-linux-gnu
+2026-01-01T02:46:48.6730303Z i686-unknown-linux-musl
+2026-01-01T02:46:48.6730470Z i686-unknown-netbsd
+2026-01-01T02:46:48.6730630Z i686-unknown-openbsd
+2026-01-01T02:46:48.6730784Z i686-unknown-uefi
+2026-01-01T02:46:48.6730942Z i686-uwp-windows-gnu
+2026-01-01T02:46:48.6731099Z i686-uwp-windows-msvc
+2026-01-01T02:46:48.6731265Z i686-win7-windows-gnu
+2026-01-01T02:46:48.6731417Z i686-win7-windows-msvc
+2026-01-01T02:46:48.6731574Z i686-wrs-vxworks
+2026-01-01T02:46:48.6731731Z loongarch32-unknown-none
+2026-01-01T02:46:48.6731932Z loongarch32-unknown-none-softfloat
+2026-01-01T02:46:48.6732151Z loongarch64-unknown-linux-gnu
+2026-01-01T02:46:48.6732359Z loongarch64-unknown-linux-musl
+2026-01-01T02:46:48.6732555Z loongarch64-unknown-linux-ohos
+2026-01-01T02:46:48.6732757Z loongarch64-unknown-none
+2026-01-01T02:46:48.6732957Z loongarch64-unknown-none-softfloat
+2026-01-01T02:46:48.6733164Z m68k-unknown-linux-gnu
+2026-01-01T02:46:48.6733338Z m68k-unknown-none-elf
+2026-01-01T02:46:48.6733526Z mips-mti-none-elf
+2026-01-01T02:46:48.6733759Z mips-unknown-linux-gnu
+2026-01-01T02:46:48.6733932Z mips-unknown-linux-musl
+2026-01-01T02:46:48.6734166Z mips-unknown-linux-uclibc
+2026-01-01T02:46:48.6735485Z mips64-openwrt-linux-musl
+2026-01-01T02:46:48.6735741Z mips64-unknown-linux-gnuabi64
+2026-01-01T02:46:48.6735944Z mips64-unknown-linux-muslabi64
+2026-01-01T02:46:48.6736163Z mips64el-unknown-linux-gnuabi64
+2026-01-01T02:46:48.6736378Z mips64el-unknown-linux-muslabi64
+2026-01-01T02:46:48.6736576Z mipsel-mti-none-elf
+2026-01-01T02:46:48.6736741Z mipsel-sony-psp
+2026-01-01T02:46:48.6736888Z mipsel-sony-psx
+2026-01-01T02:46:48.6737050Z mipsel-unknown-linux-gnu
+2026-01-01T02:46:48.6737237Z mipsel-unknown-linux-musl
+2026-01-01T02:46:48.6737431Z mipsel-unknown-linux-uclibc
+2026-01-01T02:46:48.6737617Z mipsel-unknown-netbsd
+2026-01-01T02:46:48.6737792Z mipsel-unknown-none
+2026-01-01T02:46:48.6737958Z mipsisa32r6-unknown-linux-gnu
+2026-01-01T02:46:48.6738165Z mipsisa32r6el-unknown-linux-gnu
+2026-01-01T02:46:48.6738378Z mipsisa64r6-unknown-linux-gnuabi64
+2026-01-01T02:46:48.6738614Z mipsisa64r6el-unknown-linux-gnuabi64
+2026-01-01T02:46:48.6739396Z msp430-none-elf
+2026-01-01T02:46:48.6739557Z nvptx64-nvidia-cuda
+2026-01-01T02:46:48.6739729Z powerpc-unknown-freebsd
+2026-01-01T02:46:48.6739913Z powerpc-unknown-linux-gnu
+2026-01-01T02:46:48.6740119Z powerpc-unknown-linux-gnuspe
+2026-01-01T02:46:48.6740327Z powerpc-unknown-linux-musl
+2026-01-01T02:46:48.6740535Z powerpc-unknown-linux-muslspe
+2026-01-01T02:46:48.6740732Z powerpc-unknown-netbsd
+2026-01-01T02:46:48.6740926Z powerpc-unknown-openbsd
+2026-01-01T02:46:48.6741106Z powerpc-wrs-vxworks
+2026-01-01T02:46:48.6741280Z powerpc-wrs-vxworks-spe
+2026-01-01T02:46:48.6741455Z powerpc64-ibm-aix
+2026-01-01T02:46:48.6741619Z powerpc64-unknown-freebsd
+2026-01-01T02:46:48.6741872Z powerpc64-unknown-linux-gnu
+2026-01-01T02:46:48.6742075Z powerpc64-unknown-linux-musl
+2026-01-01T02:46:48.6742272Z powerpc64-unknown-openbsd
+2026-01-01T02:46:48.6742452Z powerpc64-wrs-vxworks
+2026-01-01T02:46:48.6742625Z powerpc64le-unknown-freebsd
+2026-01-01T02:46:48.6742832Z powerpc64le-unknown-linux-gnu
+2026-01-01T02:46:48.6743034Z powerpc64le-unknown-linux-musl
+2026-01-01T02:46:48.6743233Z riscv32-wrs-vxworks
+2026-01-01T02:46:48.6743393Z riscv32e-unknown-none-elf
+2026-01-01T02:46:48.6743585Z riscv32em-unknown-none-elf
+2026-01-01T02:46:48.6743777Z riscv32emc-unknown-none-elf
+2026-01-01T02:46:48.6743959Z riscv32gc-unknown-linux-gnu
+2026-01-01T02:46:48.6744154Z riscv32gc-unknown-linux-musl
+2026-01-01T02:46:48.6744338Z riscv32i-unknown-none-elf
+2026-01-01T02:46:48.6744522Z riscv32im-risc0-zkvm-elf
+2026-01-01T02:46:48.6744701Z riscv32im-unknown-none-elf
+2026-01-01T02:46:48.6744910Z riscv32ima-unknown-none-elf
+2026-01-01T02:46:48.6745092Z riscv32imac-esp-espidf
+2026-01-01T02:46:48.6745274Z riscv32imac-unknown-none-elf
+2026-01-01T02:46:48.6745470Z riscv32imac-unknown-nuttx-elf
+2026-01-01T02:46:48.6745669Z riscv32imac-unknown-xous-elf
+2026-01-01T02:46:48.6746245Z riscv32imafc-esp-espidf
+2026-01-01T02:46:48.6746473Z riscv32imafc-unknown-none-elf
+2026-01-01T02:46:48.6746679Z riscv32imafc-unknown-nuttx-elf
+2026-01-01T02:46:48.6746868Z riscv32imc-esp-espidf
+2026-01-01T02:46:48.6747051Z riscv32imc-unknown-none-elf
+2026-01-01T02:46:48.6747237Z riscv32imc-unknown-nuttx-elf
+2026-01-01T02:46:48.6747425Z riscv64-linux-android
+2026-01-01T02:46:48.6747581Z riscv64-wrs-vxworks
+2026-01-01T02:46:48.6747741Z riscv64a23-unknown-linux-gnu
+2026-01-01T02:46:48.6747923Z riscv64gc-unknown-freebsd
+2026-01-01T02:46:48.6748107Z riscv64gc-unknown-fuchsia
+2026-01-01T02:46:48.6748281Z riscv64gc-unknown-hermit
+2026-01-01T02:46:48.6748466Z riscv64gc-unknown-linux-gnu
+2026-01-01T02:46:48.6748664Z riscv64gc-unknown-linux-musl
+2026-01-01T02:46:48.6748861Z riscv64gc-unknown-managarm-mlibc
+2026-01-01T02:46:48.6749074Z riscv64gc-unknown-netbsd
+2026-01-01T02:46:48.6749253Z riscv64gc-unknown-none-elf
+2026-01-01T02:46:48.6749443Z riscv64gc-unknown-nuttx-elf
+2026-01-01T02:46:48.6749625Z riscv64gc-unknown-openbsd
+2026-01-01T02:46:48.6749807Z riscv64imac-unknown-none-elf
+2026-01-01T02:46:48.6750040Z riscv64imac-unknown-nuttx-elf
+2026-01-01T02:46:48.6750237Z s390x-unknown-linux-gnu
+2026-01-01T02:46:48.6750566Z s390x-unknown-linux-musl
+2026-01-01T02:46:48.6750757Z sparc-unknown-linux-gnu
+2026-01-01T02:46:48.6750943Z sparc-unknown-none-elf
+2026-01-01T02:46:48.6751120Z sparc64-unknown-linux-gnu
+2026-01-01T02:46:48.6751308Z sparc64-unknown-netbsd
+2026-01-01T02:46:48.6751477Z sparc64-unknown-openbsd
+2026-01-01T02:46:48.6751653Z sparcv9-sun-solaris
+2026-01-01T02:46:48.6751811Z thumbv4t-none-eabi
+2026-01-01T02:46:48.6751972Z thumbv5te-none-eabi
+2026-01-01T02:46:48.6752127Z thumbv6m-none-eabi
+2026-01-01T02:46:48.6752286Z thumbv6m-nuttx-eabi
+2026-01-01T02:46:48.6752439Z thumbv7a-nuttx-eabi
+2026-01-01T02:46:48.6752600Z thumbv7a-nuttx-eabihf
+2026-01-01T02:46:48.6752770Z thumbv7a-pc-windows-msvc
+2026-01-01T02:46:48.6752975Z thumbv7a-uwp-windows-msvc
+2026-01-01T02:46:48.6753158Z thumbv7em-none-eabi
+2026-01-01T02:46:48.6753320Z thumbv7em-none-eabihf
+2026-01-01T02:46:48.6753490Z thumbv7em-nuttx-eabi
+2026-01-01T02:46:48.6753798Z thumbv7em-nuttx-eabihf
+2026-01-01T02:46:48.6753964Z thumbv7m-none-eabi
+2026-01-01T02:46:48.6754124Z thumbv7m-nuttx-eabi
+2026-01-01T02:46:48.6754290Z thumbv7neon-linux-androideabi
+2026-01-01T02:46:48.6754507Z thumbv7neon-unknown-linux-gnueabihf
+2026-01-01T02:46:48.6754772Z thumbv7neon-unknown-linux-musleabihf
+2026-01-01T02:46:48.6755002Z thumbv8m.base-none-eabi
+2026-01-01T02:46:48.6755177Z thumbv8m.base-nuttx-eabi
+2026-01-01T02:46:48.6755360Z thumbv8m.main-none-eabi
+2026-01-01T02:46:48.6755535Z thumbv8m.main-none-eabihf
+2026-01-01T02:46:48.6755725Z thumbv8m.main-nuttx-eabi
+2026-01-01T02:46:48.6755906Z thumbv8m.main-nuttx-eabihf
+2026-01-01T02:46:48.6756100Z wasm32-unknown-emscripten
+2026-01-01T02:46:48.6756275Z wasm32-unknown-unknown
+2026-01-01T02:46:48.6756445Z wasm32-wali-linux-musl
+2026-01-01T02:46:48.6756599Z wasm32-wasip1
+2026-01-01T02:46:48.6756757Z wasm32-wasip1-threads
+2026-01-01T02:46:48.6756917Z wasm32-wasip2
+2026-01-01T02:46:48.6757055Z wasm32-wasip3
+2026-01-01T02:46:48.6757200Z wasm32v1-none
+2026-01-01T02:46:48.6757338Z wasm64-unknown-unknown
+2026-01-01T02:46:48.6757509Z x86_64-apple-darwin
+2026-01-01T02:46:48.6757655Z x86_64-apple-ios
+2026-01-01T02:46:48.6757815Z x86_64-apple-ios-macabi
+2026-01-01T02:46:48.6757977Z x86_64-apple-tvos
+2026-01-01T02:46:48.6758135Z x86_64-apple-watchos-sim
+2026-01-01T02:46:48.6758308Z x86_64-fortanix-unknown-sgx
+2026-01-01T02:46:48.6758486Z x86_64-linux-android
+2026-01-01T02:46:48.6758639Z x86_64-lynx-lynxos178
+2026-01-01T02:46:48.6758798Z x86_64-pc-cygwin
+2026-01-01T02:46:48.6758943Z x86_64-pc-nto-qnx710
+2026-01-01T02:46:48.6759108Z x86_64-pc-nto-qnx710_iosock
+2026-01-01T02:46:48.6759285Z x86_64-pc-nto-qnx800
+2026-01-01T02:46:48.6759433Z x86_64-pc-solaris
+2026-01-01T02:46:48.6759592Z x86_64-pc-windows-gnu
+2026-01-01T02:46:48.6759753Z x86_64-pc-windows-gnullvm
+2026-01-01T02:46:48.6759931Z x86_64-pc-windows-msvc
+2026-01-01T02:46:48.6760098Z x86_64-unikraft-linux-musl
+2026-01-01T02:46:48.6760282Z x86_64-unknown-dragonfly
+2026-01-01T02:46:48.6760446Z x86_64-unknown-freebsd
+2026-01-01T02:46:48.6760617Z x86_64-unknown-fuchsia
+2026-01-01T02:46:48.6760773Z x86_64-unknown-haiku
+2026-01-01T02:46:48.6760930Z x86_64-unknown-hermit
+2026-01-01T02:46:48.6761093Z x86_64-unknown-hurd-gnu
+2026-01-01T02:46:48.6761251Z x86_64-unknown-illumos
+2026-01-01T02:46:48.6761418Z x86_64-unknown-l4re-uclibc
+2026-01-01T02:46:48.6761591Z x86_64-unknown-linux-gnu
+2026-01-01T02:46:48.6761766Z x86_64-unknown-linux-gnux32
+2026-01-01T02:46:48.6761949Z x86_64-unknown-linux-musl
+2026-01-01T02:46:48.6762127Z x86_64-unknown-linux-none
+2026-01-01T02:46:48.6762295Z x86_64-unknown-linux-ohos
+2026-01-01T02:46:48.6762476Z x86_64-unknown-managarm-mlibc
+2026-01-01T02:46:48.6762658Z x86_64-unknown-motor
+2026-01-01T02:46:48.6762815Z x86_64-unknown-netbsd
+2026-01-01T02:46:48.6762966Z x86_64-unknown-none
+2026-01-01T02:46:48.6763126Z x86_64-unknown-openbsd
+2026-01-01T02:46:48.6763291Z x86_64-unknown-redox
+2026-01-01T02:46:48.6763445Z x86_64-unknown-trusty
+2026-01-01T02:46:48.6763607Z x86_64-unknown-uefi
+2026-01-01T02:46:48.6763876Z x86_64-uwp-windows-gnu
+2026-01-01T02:46:48.6764048Z x86_64-uwp-windows-msvc
+2026-01-01T02:46:48.6764213Z x86_64-win7-windows-gnu
+2026-01-01T02:46:48.6764375Z x86_64-win7-windows-msvc
+2026-01-01T02:46:48.6764533Z x86_64-wrs-vxworks
+2026-01-01T02:46:48.6764686Z x86_64h-apple-darwin
+2026-01-01T02:46:48.6764843Z xtensa-esp32-espidf
+2026-01-01T02:46:48.6765013Z xtensa-esp32-none-elf
+2026-01-01T02:46:48.6765199Z xtensa-esp32s2-espidf
+2026-01-01T02:46:48.6765370Z xtensa-esp32s2-none-elf
+2026-01-01T02:46:48.6765545Z xtensa-esp32s3-espidf
+2026-01-01T02:46:48.6765707Z xtensa-esp32s3-none-elf
+2026-01-01T02:46:48.8216858Z ##[group]Run cargo fmt --all -- --check
+2026-01-01T02:46:48.8217265Z [36;1mcargo fmt --all -- --check[0m
+2026-01-01T02:46:48.8289095Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-01-01T02:46:48.8289417Z ##[endgroup]
+2026-01-01T02:46:59.6121392Z ##[group]Run cargo clippy --all-targets --features "debug,virtual_memory,thread_local,lockfree,slab" -- -D warnings
+2026-01-01T02:46:59.6122440Z [36;1mcargo clippy --all-targets --features "debug,virtual_memory,thread_local,lockfree,slab" -- -D warnings[0m
+2026-01-01T02:46:59.6123126Z [36;1mcargo clippy --all-targets --features "single_thread_fast,debug,virtual_memory,thread_local,slab" -- -D warnings[0m
+2026-01-01T02:46:59.6194783Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-01-01T02:46:59.6195110Z ##[endgroup]
+2026-01-01T02:47:01.6823463Z     Updating crates.io index
+2026-01-01T02:47:03.4317273Z  Downloading crates ...
+2026-01-01T02:47:03.6007386Z   Downloaded ciborium-ll v0.2.2
+2026-01-01T02:47:03.7461406Z   Downloaded windows-targets v0.52.6
+2026-01-01T02:47:03.7844851Z   Downloaded ppv-lite86 v0.2.21
+2026-01-01T02:47:03.8024412Z   Downloaded windows-link v0.2.1
+2026-01-01T02:47:03.8155701Z   Downloaded winapi-util v0.1.11
+2026-01-01T02:47:03.8332422Z   Downloaded unicode-ident v1.0.22
+2026-01-01T02:47:03.8670025Z   Downloaded memchr v2.7.6
+2026-01-01T02:47:03.9433133Z   Downloaded serde_json v1.0.145
+2026-01-01T02:47:04.0283403Z   Downloaded rayon v1.11.0
+2026-01-01T02:47:04.1306303Z   Downloaded rand v0.9.2
+2026-01-01T02:47:04.1694394Z   Downloaded plotters v0.3.7
+2026-01-01T02:47:04.2733651Z   Downloaded zerocopy-derive v0.8.27
+2026-01-01T02:47:04.5451621Z   Downloaded serde v1.0.228
+2026-01-01T02:47:04.5784082Z   Downloaded rayon-core v1.13.0
+2026-01-01T02:47:04.6162109Z   Downloaded syn v2.0.110
+2026-01-01T02:47:04.7138002Z   Downloaded regex v1.12.2
+2026-01-01T02:47:04.7809641Z   Downloaded clap_builder v4.5.52
+2026-01-01T02:47:04.8588972Z   Downloaded itertools v0.10.5
+2026-01-01T02:47:04.9302540Z   Downloaded regex-syntax v0.8.8
+2026-01-01T02:47:04.9791901Z   Downloaded zerocopy v0.8.27
+2026-01-01T02:47:05.3565023Z   Downloaded proptest v1.9.0
+2026-01-01T02:47:05.4648352Z   Downloaded criterion v0.5.1
+2026-01-01T02:47:05.5499744Z   Downloaded clap v4.5.52
+2026-01-01T02:47:06.1517289Z   Downloaded aho-corasick v1.1.4
+2026-01-01T02:47:06.2004833Z   Downloaded serde_core v1.0.228
+2026-01-01T02:47:06.2284418Z   Downloaded ryu v1.0.20
+2026-01-01T02:47:06.2652835Z   Downloaded rand_core v0.9.3
+2026-01-01T02:47:06.2778416Z   Downloaded walkdir v2.5.0
+2026-01-01T02:47:06.2985301Z   Downloaded wait-timeout v0.2.1
+2026-01-01T02:47:06.3128152Z   Downloaded tempfile v3.23.0
+2026-01-01T02:47:06.3403999Z   Downloaded rand_chacha v0.9.0
+2026-01-01T02:47:06.3505343Z   Downloaded fnv v1.0.7
+2026-01-01T02:47:06.3654092Z   Downloaded fastrand v2.3.0
+2026-01-01T02:47:06.3826903Z   Downloaded unarray v0.1.4
+2026-01-01T02:47:06.3939374Z   Downloaded regex-automata v0.4.13
+2026-01-01T02:47:06.5152937Z   Downloaded tinytemplate v1.2.1
+2026-01-01T02:47:06.5381790Z   Downloaded serde_derive v1.0.228
+2026-01-01T02:47:06.5688973Z   Downloaded same-file v1.0.6
+2026-01-01T02:47:06.5844030Z   Downloaded rusty-fork v0.3.1
+2026-01-01T02:47:06.5997294Z   Downloaded rand_xorshift v0.4.0
+2026-01-01T02:47:06.6100010Z   Downloaded quote v1.0.42
+2026-01-01T02:47:06.6467475Z   Downloaded quick-error v1.2.3
+2026-01-01T02:47:06.6581344Z   Downloaded proc-macro2 v1.0.103
+2026-01-01T02:47:06.6890772Z   Downloaded once_cell v1.21.3
+2026-01-01T02:47:06.7205968Z   Downloaded num-traits v0.2.19
+2026-01-01T02:47:06.7453925Z   Downloaded windows_x86_64_msvc v0.52.6
+2026-01-01T02:47:06.7667999Z   Downloaded half v2.7.1
+2026-01-01T02:47:06.7906968Z   Downloaded crossbeam-utils v0.8.21
+2026-01-01T02:47:06.8207709Z   Downloaded crossbeam-epoch v0.9.18
+2026-01-01T02:47:06.8411353Z   Downloaded criterion-plot v0.5.0
+2026-01-01T02:47:06.8587711Z   Downloaded cast v0.3.0
+2026-01-01T02:47:06.8723953Z   Downloaded bitflags v2.10.0
+2026-01-01T02:47:06.9223884Z   Downloaded bit-vec v0.8.0
+2026-01-01T02:47:06.9362324Z   Downloaded oorandom v11.1.5
+2026-01-01T02:47:06.9459214Z   Downloaded itoa v1.0.15
+2026-01-01T02:47:06.9622051Z   Downloaded either v1.15.0
+2026-01-01T02:47:06.9754749Z   Downloaded crossbeam-deque v0.8.6
+2026-01-01T02:47:06.9885303Z   Downloaded cfg-if v1.0.4
+2026-01-01T02:47:07.0038270Z   Downloaded anstyle v1.0.13
+2026-01-01T02:47:07.0166526Z   Downloaded plotters-svg v0.3.7
+2026-01-01T02:47:07.4909608Z   Downloaded plotters-backend v0.3.7
+2026-01-01T02:47:07.5104581Z   Downloaded is-terminal v0.4.17
+2026-01-01T02:47:07.5187570Z   Downloaded getrandom v0.3.4
+2026-01-01T02:47:07.5592428Z   Downloaded clap_lex v0.7.6
+2026-01-01T02:47:07.5677963Z   Downloaded ciborium-io v0.2.2
+2026-01-01T02:47:07.5741374Z   Downloaded ciborium v0.2.2
+2026-01-01T02:47:07.5988555Z   Downloaded bit-set v0.8.0
+2026-01-01T02:47:07.6132648Z   Downloaded anes v0.1.6
+2026-01-01T02:47:07.6512164Z   Downloaded autocfg v1.5.0
+2026-01-01T02:47:07.6824422Z   Downloaded windows-sys v0.61.2
+2026-01-01T02:47:09.3337502Z   Downloaded windows-sys v0.59.0
+2026-01-01T02:47:10.7944555Z    Compiling proc-macro2 v1.0.103
+2026-01-01T02:47:10.7945936Z    Compiling quote v1.0.42
+2026-01-01T02:47:10.7946420Z    Compiling unicode-ident v1.0.22
+2026-01-01T02:47:10.7946759Z     Checking cfg-if v1.0.4
+2026-01-01T02:47:20.6345417Z     Checking windows-link v0.2.1
+2026-01-01T02:47:20.7842303Z    Compiling getrandom v0.3.4
+2026-01-01T02:47:35.4175494Z    Compiling zerocopy v0.8.27
+2026-01-01T02:47:40.8937522Z     Checking windows-sys v0.61.2
+2026-01-01T02:47:40.8939270Z    Compiling crossbeam-utils v0.8.21
+2026-01-01T02:47:41.6505919Z    Compiling serde_core v1.0.228
+2026-01-01T02:47:42.3325101Z    Compiling autocfg v1.5.0
+2026-01-01T02:47:47.2638253Z    Compiling serde v1.0.228
+2026-01-01T02:47:47.6346350Z    Compiling num-traits v0.2.19
+2026-01-01T02:47:47.8493251Z    Compiling windows_x86_64_msvc v0.52.6
+2026-01-01T02:47:47.9227019Z    Compiling syn v2.0.110
+2026-01-01T02:47:48.1582668Z     Checking crossbeam-epoch v0.9.18
+2026-01-01T02:47:48.2738361Z     Checking rand_core v0.9.3
+2026-01-01T02:47:48.4857446Z     Checking either v1.15.0
+2026-01-01T02:47:48.5598979Z     Checking regex-syntax v0.8.8
+2026-01-01T02:47:48.6541816Z    Compiling serde_json v1.0.145
+2026-01-01T02:47:48.7718537Z     Checking once_cell v1.21.3
+2026-01-01T02:47:48.8871858Z    Compiling rayon-core v1.13.0
+2026-01-01T02:47:49.0074887Z     Checking crossbeam-deque v0.8.6
+2026-01-01T02:47:49.3016982Z     Checking winapi-util v0.1.11
+2026-01-01T02:47:49.4704452Z     Checking anstyle v1.0.13
+2026-01-01T02:47:49.7229219Z     Checking memchr v2.7.6
+2026-01-01T02:47:50.1836930Z     Checking fastrand v2.3.0
+2026-01-01T02:47:50.4207427Z     Checking ciborium-io v0.2.2
+2026-01-01T02:47:50.4875925Z     Checking clap_lex v0.7.6
+2026-01-01T02:47:50.6866113Z     Checking plotters-backend v0.3.7
+2026-01-01T02:47:50.6915874Z     Checking itoa v1.0.15
+2026-01-01T02:47:50.8407393Z     Checking ryu v1.0.20
+2026-01-01T02:47:50.9418256Z     Checking plotters-svg v0.3.7
+2026-01-01T02:47:51.0817412Z     Checking clap_builder v4.5.52
+2026-01-01T02:47:51.1098572Z     Checking regex-automata v0.4.13
+2026-01-01T02:47:52.1631089Z     Checking tempfile v3.23.0
+2026-01-01T02:47:52.4382995Z     Checking same-file v1.0.6
+2026-01-01T02:47:52.5589687Z     Checking windows-targets v0.52.6
+2026-01-01T02:47:53.0021488Z     Checking itertools v0.10.5
+2026-01-01T02:47:53.1175298Z     Checking cast v0.3.0
+2026-01-01T02:47:53.1865576Z     Checking bit-vec v0.8.0
+2026-01-01T02:47:53.3188789Z     Checking wait-timeout v0.2.1
+2026-01-01T02:47:53.3953531Z     Checking quick-error v1.2.3
+2026-01-01T02:47:53.4390141Z     Checking fnv v1.0.7
+2026-01-01T02:47:53.4756698Z     Checking bit-set v0.8.0
+2026-01-01T02:47:53.5148779Z     Checking rusty-fork v0.3.1
+2026-01-01T02:47:53.6288442Z     Checking clap v4.5.52
+2026-01-01T02:47:53.6939492Z     Checking rayon v1.11.0
+2026-01-01T02:47:53.7500949Z     Checking regex v1.12.2
+2026-01-01T02:47:54.1533205Z     Checking windows-sys v0.59.0
+2026-01-01T02:47:54.6941915Z     Checking criterion-plot v0.5.0
+2026-01-01T02:47:54.8567411Z    Compiling zerocopy-derive v0.8.27
+2026-01-01T02:47:55.0088654Z    Compiling serde_derive v1.0.228
+2026-01-01T02:47:55.4532414Z     Checking walkdir v2.5.0
+2026-01-01T02:47:55.6293422Z     Checking plotters v0.3.7
+2026-01-01T02:47:56.9599731Z     Checking rand v0.9.2
+2026-01-01T02:47:57.0743637Z     Checking rand_xorshift v0.4.0
+2026-01-01T02:47:57.1932779Z     Checking is-terminal v0.4.17
+2026-01-01T02:47:57.2840936Z     Checking oorandom v11.1.5
+2026-01-01T02:47:57.4219901Z     Checking anes v0.1.6
+2026-01-01T02:47:57.6323943Z     Checking unarray v0.1.4
+2026-01-01T02:47:57.6395792Z     Checking bitflags v2.10.0
+2026-01-01T02:47:57.7329450Z     Checking arena-b v1.0.0 (D:\a\arena-b\arena-b)
+2026-01-01T02:47:59.5520176Z     Checking tinytemplate v1.2.1
+2026-01-01T02:47:59.9726130Z     Checking half v2.7.1
+2026-01-01T02:47:59.9726580Z     Checking ppv-lite86 v0.2.21
+2026-01-01T02:48:00.4560709Z     Checking ciborium-ll v0.2.2
+2026-01-01T02:48:00.6140754Z     Checking ciborium v0.2.2
+2026-01-01T02:48:00.7529540Z     Checking rand_chacha v0.9.0
+2026-01-01T02:48:00.9411800Z     Checking proptest v1.9.0
+2026-01-01T02:48:00.9997366Z error[E0133]: call to unsafe function `arena::Arena::reset` is unsafe and requires unsafe function or block
+2026-01-01T02:48:00.9998278Z    --> src\core.rs:614:9
+2026-01-01T02:48:00.9998668Z     |
+2026-01-01T02:48:00.9998929Z 614 |         self.arena.reset();
+2026-01-01T02:48:00.9999307Z     |         ^^^^^^^^^^^^^^^^^^ call to unsafe function
+2026-01-01T02:48:00.9999681Z     |
+2026-01-01T02:48:01.0000185Z     = note: consult the function's documentation for information on how to avoid undefined behavior
+2026-01-01T02:48:01.0000661Z 
+2026-01-01T02:48:01.1106890Z For more information about this error, try `rustc --explain E0133`.
+2026-01-01T02:48:01.2347318Z error: could not compile `arena-b` (lib) due to 1 previous error
+2026-01-01T02:48:01.2347948Z warning: build failed, waiting for other jobs to finish...
+2026-01-01T02:48:03.5003452Z     Checking criterion v0.5.1
+2026-01-01T02:48:03.5004010Z     Checking arena-b v1.0.0 (D:\a\arena-b\arena-b)
+2026-01-01T02:48:03.7872924Z error[E0133]: call to unsafe function `arena::Arena::reset` is unsafe and requires unsafe function or block
+2026-01-01T02:48:03.7874461Z    --> src\core.rs:614:9
+2026-01-01T02:48:03.7874776Z     |
+2026-01-01T02:48:03.7875040Z 614 |         self.arena.reset();
+2026-01-01T02:48:03.7875396Z     |         ^^^^^^^^^^^^^^^^^^ call to unsafe function
+2026-01-01T02:48:03.7875755Z     |
+2026-01-01T02:48:03.7876285Z     = note: consult the function's documentation for information on how to avoid undefined behavior
+2026-01-01T02:48:03.7876850Z 
+2026-01-01T02:48:03.8470607Z For more information about this error, try `rustc --explain E0133`.
+2026-01-01T02:48:03.8573822Z error: could not compile `arena-b` (lib) due to 1 previous error
+2026-01-01T02:48:03.8574487Z warning: build failed, waiting for other jobs to finish...
+2026-01-01T02:48:05.0358706Z ##[error]Process completed with exit code 1.
+2026-01-01T02:48:05.0621694Z Post job cleanup.
+2026-01-01T02:48:05.3157835Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-01-01T02:48:05.3442586Z git version 2.52.0.windows.1
+2026-01-01T02:48:05.3527877Z Temporarily overriding HOME='D:\a\_temp\8137400a-44dd-4af3-b811-69ce8e03a7a8' before making global git config changes
+2026-01-01T02:48:05.3528980Z Adding repository directory to the temporary git global config as a safe directory
+2026-01-01T02:48:05.3540563Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\arena-b\arena-b
+2026-01-01T02:48:05.3903383Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-01-01T02:48:05.4275018Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-01-01T02:48:06.0091477Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-01-01T02:48:06.0375135Z http.https://github.com/.extraheader
+2026-01-01T02:48:06.0427542Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-01-01T02:48:06.0772282Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-01-01T02:48:06.6424548Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-01-01T02:48:06.6755431Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-01-01T02:48:07.2713416Z Cleaning up orphan processes
+2026-01-01T02:48:07.2978474Z Terminate orphan process: pid (5676) (vctip)
