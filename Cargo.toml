@@ -8,8 +8,9 @@ readme = "README.md"
 repository = "https://github.com/M1tsumi/arena-b"
 homepage = "https://quefep.uk"
 documentation = "https://docs.rs/arena-b"
-keywords = ["allocator", "bump", "lock-free", "virtual-memory", "thread-local", "slab", "arena", "performance"]
+keywords = ["allocator", "arena", "bump", "lock-free", "performance"]
 categories = ["memory-management", "data-structures"]
+exclude = ["failed-ci/", "target/", ".github/", "RELEASE_NOTES_*.md"]
 
 [lib]
 name = "arena_b"
