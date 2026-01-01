@@ -100,7 +100,7 @@ impl VirtualMemoryRegion {
                 };
                 let result = VirtualAlloc(commit_ptr as *mut _, size, MEM_COMMIT, PAGE_READWRITE);
                 if result.is_null() {
-                    let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+                    let err = windows_sys::Win32::Foundation::GetLastError();
                     return Err(match err {
                         windows_sys::Win32::Foundation::ERROR_NOT_ENOUGH_MEMORY => {
                             "Insufficient virtual memory during commit"
@@ -180,7 +180,7 @@ impl VirtualMemoryRegion {
                 eprintln!("Decommitting: ptr={:?} size={}", decommit_ptr, size);
                 let result = VirtualFree(decommit_ptr as *mut _, size, MEM_DECOMMIT);
                 if result == 0 {
-                    let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+                    let err = windows_sys::Win32::Foundation::GetLastError();
                     eprintln!(
                         "VirtualFree failed: ptr={:?} size={} GetLastError={}",
                         decommit_ptr, size, err
@@ -243,7 +243,7 @@ impl Drop for VirtualMemoryRegion {
                     use windows_sys::Win32::System::Memory::{VirtualFree, MEM_RELEASE};
                     let res = VirtualFree(self.ptr as *mut _, 0, MEM_RELEASE);
                     if res == 0 {
-                        let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+                        let err = windows_sys::Win32::Foundation::GetLastError();
                         eprintln!("VirtualMemoryRegion::drop: VirtualFree(MEM_RELEASE) failed ptr={:?} GetLastError={}", self.ptr, err);
                     }
                 }

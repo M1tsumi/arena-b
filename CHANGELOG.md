@@ -4,8 +4,6 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [1.0.0] - 2025-12-31
 
-## [1.0.0] - 2025-12-31
-
 This is the project's first stable release. The goal of 1.0.0 is to offer a stable, well-documented, and predictable API surface for high-performance allocation needs while keeping optional features behind feature flags so consumers only pay for what they use.
 
 ### Highlights
