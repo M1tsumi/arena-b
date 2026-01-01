@@ -611,6 +611,8 @@ impl<'scope, 'arena> Scope<'scope, 'arena> {
 
 impl<'scope, 'arena> Drop for Scope<'scope, 'arena> {
     fn drop(&mut self) {
-        self.arena.reset();
+        unsafe {
+            self.arena.reset();
+        }
     }
 }
