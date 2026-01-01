@@ -1,3 +1,5 @@
+use arena_b::Arena;
+
 #[test]
 #[cfg(feature = "arena_module")]
 fn chunk_usage_reports_used_and_capacity() {
