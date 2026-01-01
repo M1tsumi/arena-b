@@ -9,13 +9,6 @@ pub struct Arena {
     allocation_counter: core::sync::atomic::AtomicUsize,
 }
 
-pub struct ArenaCheckpoint {
-    chunk_index: usize,
-    chunk_offset: usize,
-    allocation_count: usize,
-    bytes_used: usize,
-}
-
 pub struct ArenaStats {
     pub bytes_allocated: usize,
     pub bytes_used: usize,
@@ -252,8 +245,8 @@ impl Arena {
             ArenaCheckpoint {
                 chunk_index: current_chunk_idx,
                 chunk_offset: current_chunk.used(),
-                allocation_count: 0,
-                bytes_used: 0,
+                checkpoint_id: inner.current_checkpoint_id,
+                allocation_count: self.allocation_counter.load(Ordering::Relaxed),
             }
         }
     }
@@ -263,6 +256,7 @@ impl Arena {
         unsafe {
             let inner = &mut *self.inner.get();
             inner.checkpoints.push(checkpoint);
+            inner.current_checkpoint_id += 1;
         }
         checkpoint
     }
