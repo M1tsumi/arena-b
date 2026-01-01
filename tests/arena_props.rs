@@ -11,15 +11,13 @@ proptest! {
 
     #[test]
     fn reset_frees_all_memory(sizes in proptest::collection::vec(1usize..64, 0..16)) {
-        let mut arena = Arena::with_capacity(2048);
+        let arena = Arena::with_capacity(2048);
         for size in &sizes {
             let buf = vec![0_u8; *size];
             let _ = arena.alloc_slice_copy(&buf);
         }
 
-        unsafe {
-            arena.reset();
-        }
+        arena.reset();
 
         let stats = arena.stats();
         prop_assert_eq!(stats.bytes_used, 0);
