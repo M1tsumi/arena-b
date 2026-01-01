@@ -259,7 +259,12 @@ impl Arena {
     }
 
     pub fn push_checkpoint(&self) -> ArenaCheckpoint {
-        self.checkpoint()
+        let checkpoint = self.checkpoint();
+        unsafe {
+            let inner = &mut *self.inner.get();
+            inner.checkpoints.push(checkpoint);
+        }
+        checkpoint
     }
 
     pub fn checkpoint_count(&self) -> usize {
