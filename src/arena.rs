@@ -39,7 +39,6 @@ pub use crate::lockfree::{LockFreeBuffer, LockFreeStats};
 
 #[cfg(feature = "debug")]
 pub use crate::debug::{AllocationInfo, DEBUG_STATE, FREED_MAGIC, GUARD_MAGIC};
-
 /// v0.5.0: Arena builder for customizing arena creation
 pub struct ArenaBuilder {
     initial_capacity: usize,
@@ -833,14 +832,14 @@ impl Arena {
     /// {
     ///     let arena = Arena::new();
     ///     let checkpoint = arena.checkpoint();
-    ///     
+    ///
     ///     let value = arena.alloc(42u32);
-    ///     
+    ///
     ///     // Check validity before rewind (may be unavailable in doctest)
     ///     let _ = unsafe { arena.check_valid(value) };
-    ///     
+    ///
     ///     unsafe { arena.rewind_to_checkpoint(checkpoint); }
-    ///     
+    ///
     ///     // Note: Use-after-rewind detection may not work in doctest environment
     ///     // This is primarily for demonstration purposes
     /// }
