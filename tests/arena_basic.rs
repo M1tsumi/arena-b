@@ -26,12 +26,10 @@ fn alloc_str_basic() {
 
 #[test]
 fn reset_allows_reuse() {
-    let mut arena = Arena::with_capacity(128);
+    let arena = Arena::with_capacity(128);
     let first = arena.alloc(1_u32);
     assert_eq!(*first, 1);
-    unsafe {
-        arena.reset();
-    }
+    arena.reset();
     let second = arena.alloc(2_u32);
     assert_eq!(*second, 2);
 }

@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[cfg(feature = "arena_module")]
 mod tests {
     use arena_b::ArenaBuilder;
 
