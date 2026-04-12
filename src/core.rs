@@ -25,7 +25,7 @@ const PREFETCH_WARMUP_SIZE: usize = 64;
 
 // Memory pool for small allocations
 pub struct MemoryPool {
-    slots: Vec<Option<NonNull<u8>>>,
+    slots: Vec<NonNull<u8>>,
     size_class: usize,
     capacity: usize,
 }
@@ -40,12 +40,12 @@ impl MemoryPool {
     }
 
     pub fn alloc(&mut self) -> Option<NonNull<u8>> {
-        self.slots.pop().flatten()
+        self.slots.pop()
     }
 
     pub fn dealloc(&mut self, ptr: NonNull<u8>) {
         if self.slots.len() < self.capacity {
-            self.slots.push(Some(ptr));
+            self.slots.push(ptr);
         }
     }
 
@@ -128,10 +128,6 @@ impl Chunk {
         }
         // Round up to next multiple of 64 for alignment
         let capacity = (capacity + 63) & !63;
-        eprintln!(
-            "Attempting allocation: requested_capacity={} aligned_capacity={} alignment=64",
-            capacity, capacity
-        );
         let layout = Layout::from_size_align(capacity, 64).map_err(|_| "Invalid layout")?;
 
         let ptr = unsafe { alloc(layout) };
@@ -149,32 +145,33 @@ impl Chunk {
     pub fn allocate(&self, layout: Layout) -> Option<*mut u8> {
         let size = layout.size();
         let align = layout.align();
+        loop {
+            let current_used = self.used.load(Ordering::Acquire);
+            let start = (current_used + align - 1) & !(align - 1);
+            let end = start.checked_add(size)?;
 
-        let current_used = self.used.load(Ordering::Acquire);
-        let start = (current_used + align - 1) & !(align - 1);
-        let end = start + size;
-
-        if end > self.capacity {
-            return None;
-        }
-
-        if self
-            .used
-            .compare_exchange_weak(current_used, end, Ordering::AcqRel, Ordering::Acquire)
-            .is_ok()
-        {
-            unsafe {
-                let ptr = self.ptr.as_ptr().add(start);
-                // Prefetch the allocated memory
-                #[cfg(target_arch = "x86_64")]
-                if size >= PREFETCH_WARMUP_SIZE {
-                    _mm_prefetch(ptr as *const i8, _MM_HINT_T0);
-                }
-                return Some(ptr);
+            if end > self.capacity {
+                return None;
             }
-        }
 
-        None
+            if self
+                .used
+                .compare_exchange_weak(current_used, end, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                unsafe {
+                    let ptr = self.ptr.as_ptr().add(start);
+                    // Prefetch the allocated memory
+                    #[cfg(target_arch = "x86_64")]
+                    if size >= PREFETCH_WARMUP_SIZE {
+                        _mm_prefetch(ptr as *const i8, _MM_HINT_T0);
+                    }
+                    return Some(ptr);
+                }
+            }
+
+            core::hint::spin_loop();
+        }
     }
 
     pub fn reset(&self) {
@@ -203,31 +200,11 @@ impl Drop for Chunk {
         unsafe {
             if self.capacity > 0 {
                 if let Ok(layout) = Layout::from_size_align(self.capacity, 64) {
-                    eprintln!(
-                        "[Chunk::drop] dealloc ptr={:p} capacity={}",
-                        self.ptr.as_ptr(),
-                        self.capacity
-                    );
-                    // Print a backtrace to help identify the drop origin when debugging
-                    eprintln!(
-                        "[Chunk::drop] backtrace:\n{}",
-                        std::backtrace::Backtrace::capture()
-                    );
                     dealloc(self.ptr.as_ptr(), layout);
                 } else {
                     // Fallback: deallocate using a minimal layout
-                    let fallback = Layout::from_size_align(64, 64).unwrap_or_else(|_| {
-                        eprintln!("[Chunk::drop] Layout::from_size_align(fallback) failed, using minimal layout");
-                        Layout::from_size_align(8, 8).expect("fallback layout invalid")
-                    });
-                    eprintln!(
-                        "[Chunk::drop] dealloc ptr={:p} capacity=fallback(64)",
-                        self.ptr.as_ptr()
-                    );
-                    eprintln!(
-                        "[Chunk::drop] backtrace:\n{}",
-                        std::backtrace::Backtrace::capture()
-                    );
+                    let fallback =
+                        Layout::from_size_align(64, 64).expect("64-byte fallback layout invalid");
                     dealloc(self.ptr.as_ptr(), fallback);
                 }
             }
@@ -360,20 +337,6 @@ impl ArenaInner {
     pub fn allocate(&mut self, layout: Layout) -> Option<*mut u8> {
         let size = layout.size();
 
-        // Try memory pool for small allocations
-        if size <= 4096 {
-            if let Some(_pool) = self.pools.iter().find(|p| p.size_class() >= size) {
-                if let Some(ptr) = self
-                    .pools
-                    .iter_mut()
-                    .find(|p| p.size_class() >= size)
-                    .and_then(|p| p.alloc())
-                {
-                    return Some(ptr.as_ptr());
-                }
-            }
-        }
-
         // Try current chunk (use safe clamped index)
         let current_chunk_idx = self.current_chunk.load(Ordering::Acquire);
         let chunk_idx = if current_chunk_idx >= self.chunks.len() {
@@ -461,7 +424,6 @@ impl ArenaInner {
             allocation_count: alloc_count,
         };
 
-        self.checkpoints.push(checkpoint);
         self.current_checkpoint_id += 1;
 
         checkpoint
@@ -495,12 +457,9 @@ impl ArenaInner {
             }
         }
 
-        // Remove checkpoints after this one
-        self.checkpoints.retain(|cp| {
-            cp.chunk_index < checkpoint.chunk_index
-                || (cp.chunk_index == checkpoint.chunk_index
-                    && cp.chunk_offset <= checkpoint.chunk_offset)
-        });
+        // Keep only checkpoints that happened before this rewind target.
+        self.checkpoints
+            .retain(|cp| cp.checkpoint_id < checkpoint.checkpoint_id);
 
         // Update debug tracking
         #[cfg(feature = "debug")]
@@ -538,7 +497,9 @@ impl ArenaInner {
     }
 
     pub fn push_checkpoint(&mut self) -> ArenaCheckpoint {
-        self.checkpoint()
+        let checkpoint = self.checkpoint();
+        self.checkpoints.push(checkpoint);
+        checkpoint
     }
 
     pub fn pop_and_rewind(&mut self) -> Result<(), &'static str> {

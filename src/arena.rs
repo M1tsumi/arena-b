@@ -9,6 +9,7 @@ use core::mem::MaybeUninit;
 use core::ptr;
 use core::slice;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use std::alloc::handle_alloc_error;
 use std::ptr::NonNull;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -245,7 +246,6 @@ pub struct Arena {
 }
 
 unsafe impl Send for Arena {}
-unsafe impl Sync for Arena {}
 
 impl Arena {
     /// Creates a new arena with the default capacity (64KB).
@@ -260,8 +260,7 @@ impl Arena {
     pub fn with_capacity(capacity: usize) -> Self {
         match Self::try_with_capacity(capacity) {
             Ok(a) => a,
-            Err(e) => {
-                eprintln!("Arena::with_capacity: failed to create arena (capacity={}): {}. Falling back to default arena.", capacity, e);
+            Err(_e) => {
                 // Fallback to a minimal default to keep behavior non-panicking
                 let inner = ArenaInner::new(crate::DEFAULT_CHUNK_SIZE)
                     .expect("Failed to create fallback arena");
@@ -325,7 +324,6 @@ impl Arena {
     pub fn with_virtual_memory(reserve_size: usize) -> Self {
         let mut reserve_size = reserve_size;
         if reserve_size == 0 {
-            eprintln!("Arena::with_virtual_memory: reserve_size == 0, using default reserve");
             reserve_size = crate::DEFAULT_CHUNK_SIZE * 256; // fallback default ~16MB-ish
         }
         let capacity = reserve_size.min(64 * 1024); // Start with 64KB committed
@@ -336,7 +334,7 @@ impl Arena {
         match VirtualMemoryRegion::new(reserve_size) {
             Ok(region) => inner.virtual_region = Some(region),
             Err(e) => {
-                eprintln!("Warning: could not create virtual memory region (reserve_size={}): {:?}. Continuing without virtual memory.", reserve_size, e);
+                let _ = e;
                 inner.virtual_region = None;
             }
         }
@@ -402,11 +400,6 @@ impl Arena {
             let layout = match Layout::array::<T>(len) {
                 Ok(l) => l,
                 Err(_) => {
-                    eprintln!(
-                        "Arena::alloc_slice_copy: invalid layout for len={} size_of={}",
-                        len,
-                        core::mem::size_of::<T>()
-                    );
                     return unsafe {
                         slice::from_raw_parts_mut(NonNull::<T>::dangling().as_ptr(), 0)
                     };
@@ -620,10 +613,10 @@ impl Arena {
                         ptr
                     }
                 } else {
-                    ptr::null_mut()
+                    handle_alloc_error(layout)
                 }
             }
-            Err(_) => ptr::null_mut(),
+            Err(_) => handle_alloc_error(layout),
         }
     }
 
@@ -760,8 +753,8 @@ impl Arena {
     /// Returns the checkpoint that was pushed.
     #[inline]
     pub fn push_checkpoint(&self) -> crate::ArenaCheckpoint {
-        // `ArenaInner::checkpoint()` already records the checkpoint in
-        // `inner.checkpoints`; call the inner helper to avoid double-pushing.
+        // Use the inner stack-aware helper so only explicit push/pop flows
+        // participate in checkpoint stack bookkeeping.
         let inner = unsafe { &mut *self.inner.get() };
         inner.push_checkpoint()
     }

@@ -4,11 +4,6 @@ extern crate alloc;
 
 use alloc::alloc::{alloc, dealloc, Layout};
 use core::ptr;
-#[cfg(unix)]
-fn get_errno() -> i32 {
-    unsafe { *libc::__errno_location() }
-}
-
 const PAGE_SIZE: usize = 4096;
 const DEFAULT_RESERVE_SIZE: usize = 16 * 1024 * 1024; // 16MB
 const DEFAULT_COMMIT_SIZE: usize = 64 * 1024; // 64KB
@@ -53,19 +48,12 @@ impl VirtualMemoryRegion {
         #[cfg(windows)]
         {
             if ptr.is_null() {
-                let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
-                eprintln!("VirtualMemoryRegion::new: VirtualAlloc failed, reserve_size={} GetLastError={}", reserve_size, err);
                 return Err("Failed to reserve virtual memory");
             }
         }
         #[cfg(unix)]
         {
             if std::ptr::eq(ptr, libc::MAP_FAILED as *mut _) {
-                let errno = get_errno();
-                eprintln!(
-                    "VirtualMemoryRegion::new: mmap failed, reserve_size={} errno={}",
-                    reserve_size, errno
-                );
                 return Err("Failed to reserve virtual memory");
             }
         }
@@ -117,11 +105,6 @@ impl VirtualMemoryRegion {
                     libc::PROT_READ | libc::PROT_WRITE,
                 );
                 if result != 0 {
-                    let errno = get_errno();
-                    eprintln!(
-                        "mprotect commit failed: ptr={:?} size={} errno={}",
-                        commit_ptr, size, errno
-                    );
                     return Err("Failed to commit virtual memory");
                 }
 
@@ -168,37 +151,20 @@ impl VirtualMemoryRegion {
             return Err("Invalid pointer for decommit");
         }
 
-        eprintln!(
-            "Decommitting virtual memory: offset={}, size={}, end={}, committed_size={}",
-            offset, size, end, self.committed_size
-        );
-
         unsafe {
             #[cfg(windows)]
             {
                 use windows_sys::Win32::System::Memory::{VirtualFree, MEM_DECOMMIT};
-                eprintln!("Decommitting: ptr={:?} size={}", decommit_ptr, size);
                 let result = VirtualFree(decommit_ptr as *mut _, size, MEM_DECOMMIT);
                 if result == 0 {
-                    let err = windows_sys::Win32::Foundation::GetLastError();
-                    eprintln!(
-                        "VirtualFree failed: ptr={:?} size={} GetLastError={}",
-                        decommit_ptr, size, err
-                    );
                     return Err("Failed to decommit virtual memory");
                 }
             }
             #[cfg(unix)]
             {
-                eprintln!("Decommitting: ptr={:?} size={}", decommit_ptr, size);
                 let result =
                     libc::mprotect(decommit_ptr as *mut libc::c_void, size, libc::PROT_NONE);
                 if result != 0 {
-                    let errno = get_errno();
-                    eprintln!(
-                        "mprotect failed: ptr={:?} size={} errno={}",
-                        decommit_ptr, size, errno
-                    );
                     return Err("Failed to decommit virtual memory");
                 }
 
@@ -241,22 +207,11 @@ impl Drop for VirtualMemoryRegion {
                 #[cfg(windows)]
                 {
                     use windows_sys::Win32::System::Memory::{VirtualFree, MEM_RELEASE};
-                    let res = VirtualFree(self.ptr as *mut _, 0, MEM_RELEASE);
-                    if res == 0 {
-                        let err = windows_sys::Win32::Foundation::GetLastError();
-                        eprintln!("VirtualMemoryRegion::drop: VirtualFree(MEM_RELEASE) failed ptr={:?} GetLastError={}", self.ptr, err);
-                    }
+                    let _ = VirtualFree(self.ptr as *mut _, 0, MEM_RELEASE);
                 }
                 #[cfg(unix)]
                 {
-                    let res = libc::munmap(self.ptr as *mut libc::c_void, self.reserved_size);
-                    if res != 0 {
-                        let errno = get_errno();
-                        eprintln!(
-                            "VirtualMemoryRegion::drop: munmap failed ptr={:?} size={} errno={}",
-                            self.ptr, self.reserved_size, errno
-                        );
-                    }
+                    let _ = libc::munmap(self.ptr as *mut libc::c_void, self.reserved_size);
                 }
             }
         }

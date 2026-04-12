@@ -166,11 +166,8 @@ impl LockFreeBuffer {
             {
                 (unsafe { alloc(layout) }, LOCKFREE_BUFFER_SIZE)
             } else {
-                eprintln!("LockFreeBuffer::new: Layout::from_size_align failed for size={} align={}. Falling back to minimal allocation.", LOCKFREE_BUFFER_SIZE, LOCKFREE_ALIGNMENT);
-                let fallback = Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT).unwrap_or_else(|_| {
-                    eprintln!("LockFreeBuffer::new: fallback layout creation failed, using minimal sized layout");
-                    Layout::from_size_align(8,8).expect("fallback layout invalid")
-                });
+                let fallback = Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT)
+                    .expect("lockfree fallback layout invalid");
                 (unsafe { alloc(fallback) }, LOCKFREE_ALIGNMENT)
             };
 
@@ -190,11 +187,8 @@ impl LockFreeBuffer {
             {
                 (unsafe { alloc(layout) }, LOCKFREE_BUFFER_SIZE)
             } else {
-                eprintln!("LockFreeBuffer::new: Layout::from_size_align failed for size={} align={}. Falling back to minimal allocation.", LOCKFREE_BUFFER_SIZE, LOCKFREE_ALIGNMENT);
-                let fallback = Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT).unwrap_or_else(|_| {
-                    eprintln!("LockFreeBuffer::new: fallback layout creation failed, using minimal sized layout");
-                    Layout::from_size_align(8,8).expect("fallback layout invalid")
-                });
+                let fallback = Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT)
+                    .expect("lockfree fallback layout invalid");
                 (unsafe { alloc(fallback) }, LOCKFREE_ALIGNMENT)
             };
 
@@ -405,28 +399,11 @@ impl Drop for LockFreeBuffer {
             unsafe {
                 if self.capacity > 0 {
                     if let Ok(layout) = Layout::from_size_align(self.capacity, LOCKFREE_ALIGNMENT) {
-                        eprintln!(
-                            "[LockFreeBuffer::drop] dealloc ptr={:p} capacity={}",
-                            buffer_ptr, self.capacity
-                        );
-                        eprintln!(
-                            "[LockFreeBuffer::drop] backtrace:\n{}",
-                            std::backtrace::Backtrace::capture()
-                        );
                         dealloc(buffer_ptr, layout);
                     } else {
-                        let fallback = Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT).unwrap_or_else(|_| {
-                            eprintln!("[LockFreeBuffer::drop] Layout::from_size_align(fallback) failed, using minimal layout");
-                            Layout::from_size_align(8, 8).expect("fallback layout invalid")
-                        });
-                        eprintln!(
-                            "[LockFreeBuffer::drop] dealloc ptr={:p} capacity=fallback({})",
-                            buffer_ptr, LOCKFREE_ALIGNMENT
-                        );
-                        eprintln!(
-                            "[LockFreeBuffer::drop] backtrace:\n{}",
-                            std::backtrace::Backtrace::capture()
-                        );
+                        let fallback =
+                            Layout::from_size_align(LOCKFREE_ALIGNMENT, LOCKFREE_ALIGNMENT)
+                                .expect("lockfree fallback layout invalid");
                         dealloc(buffer_ptr, fallback);
                     }
                 }
@@ -725,11 +702,6 @@ impl<T> Drop for LockFreePoolInner<T> {
                 // properly if it's initialized. Attempt to read and drop it.
                 let data_ptr = boxed.data.as_ptr();
                 let _ = std::ptr::read(data_ptr);
-                eprintln!("[LockFreePoolInner::drop] freed node={:p}", head);
-                eprintln!(
-                    "[LockFreePoolInner::drop] backtrace:\n{}",
-                    std::backtrace::Backtrace::capture()
-                );
                 // `boxed` destructor will free the node memory (data already moved out)
             }
 

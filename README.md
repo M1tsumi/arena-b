@@ -7,9 +7,14 @@
 [![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows%20%7C%20macos-lightgrey.svg)]()
 
-**Ultra-fast bump allocation arena for high-performance Rust applications**
+**A practical bump allocator for high-throughput Rust workloads**
 
 `arena-b` is a compact, battle-tested bump allocator for workloads that allocate many short-lived objects and prefer bulk reclamation. Allocate objects quickly into contiguous chunks and free them all at once using checkpoints, scopes, or a full reset — eliminating per-object deallocation overhead and fragmentation.
+
+## Real-World Status
+
+`arena-b` v1.1.0 focuses on being useful in production, not just looking fast on paper.
+The allocator hot paths were cleaned up, checkpoint bookkeeping was fixed, concurrency semantics were tightened, and benchmarks were updated to measure allocator work instead of setup noise.
 
 ## Overview
 
@@ -43,6 +48,26 @@ fn main() {
 - **Slab allocator** *(optional)*: Size-class based caching for frequent small object sizes.
 - **Debug tooling** *(optional)*: Guard-based use-after-rewind detection, leak reports and richer diagnostics when the `debug` feature is enabled.
 - **Fine-grained feature flags**: Only enable what you need — `virtual_memory`, `thread_local`, `lockfree`, `slab`, `debug`, `stats`.
+
+## What's New in v1.1.0
+
+This release is a performance and reliability refresh.
+
+- Removed hidden release-path overhead from allocator internals (unconditional logging/backtrace capture in hot paths).
+- Fixed checkpoint bookkeeping so repeated `checkpoint` + `rewind_to_checkpoint` loops stay stable over time.
+- Tightened allocation failure handling so unrecoverable allocation failures are explicit.
+- Corrected thread-safety semantics: `Arena` is `Send` but intentionally not `Sync`; use `SyncArena` for shared cross-thread access.
+- Reworked benchmark methodology to reuse arenas and rewind inside benchmark loops.
+
+### Snapshot (quick Criterion, release build)
+
+| Benchmark | arena-b | baseline | Relative |
+|-----------|---------|----------|----------|
+| `alloc_u64/arena_alloc` vs `box_new` | ~4.7ns | ~42ns | ~8.9x faster |
+| `many_allocs_u64/arena_many` vs `box_many` | ~5.6us | ~27us | ~4.8x faster |
+| `reused_arena_many_u64/arena_reused_scope` | ~5.3us | prior run ~33us | large improvement |
+
+Results vary by CPU, OS, compiler, and feature flags; run `cargo bench --all -- --quick` in your environment for a direct comparison.
 
 ## What's New in v1.0.0
 
@@ -89,7 +114,7 @@ Add `arena-b` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-arena-b = "1.0.0"
+arena-b = "1.1.0"
 ```
 
 ### Quick Start
@@ -109,13 +134,13 @@ cargo run --example game_loop
 
 ```toml
 # Basic bump allocator
-arena-b = "1.0.0"
+arena-b = "1.1.0"
 
 # Development with safety checks
-arena-b = { version = "1.0.0", features = ["debug"] }
+arena-b = { version = "1.1.0", features = ["debug"] }
 
 # Maximum performance for production
-arena-b = { version = "1.0.0", features = ["virtual_memory", "thread_local", "lockfree", "slab"] }
+arena-b = { version = "1.1.0", features = ["virtual_memory", "thread_local", "lockfree", "slab"] }
 ```
 
 | Feature | Description | Performance Impact | When to Use |
@@ -209,13 +234,18 @@ fn main() {
 
 ## Performance Characteristics
 
-| Operation | arena-b | std::alloc Box | std::alloc Vec | Improvement |
-|-----------|---------|----------------|----------------|-------------|
-| Small allocations (≤64B) | ~5ns | ~50ns | ~25ns | **10x faster** |
-| Medium allocations (≤4KB) | ~20ns | ~200ns | ~100ns | **10x faster** |
-| Large allocations (>4KB) | ~100ns | ~500ns | ~300ns | **5x faster** |
-| Bulk reset | ~10ns | N/A | N/A | **Instant** |
-| Memory overhead | ~64B/chunk | ~16B/object | ~24B/object | **Minimal** |
+`arena-b` performs best when allocations are short-lived and reclaimed in bulk.
+If your workload naturally has frame/request/phase boundaries, arenas can remove allocator churn and reduce tail latency.
+
+Representative quick benchmark snapshot from this repository (release profile):
+
+| Workload | arena-b | baseline | Notes |
+|----------|---------|----------|-------|
+| single alloc+rewind (`alloc_u64/arena_alloc`) | ~4.7ns | `box_new` ~42ns | very strong fit for transient values |
+| 1024 allocs+rewind (`many_allocs_u64/arena_many`) | ~5.6us | `box_many` ~27us | bulk lifetime wins are clear |
+| scope-based reuse (`arena_reused_scope`) | ~5.3us | prior run ~33us | large gain from stable checkpoint bookkeeping |
+
+For your own decisions, always benchmark with your real object sizes and lifetime shapes.
 
 ### Benchmarks
 

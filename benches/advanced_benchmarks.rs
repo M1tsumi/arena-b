@@ -7,13 +7,15 @@ fn bench_lockfree_performance(c: &mut Criterion) {
 
     for size in [8, 16, 32, 64, 128, 256, 512, 1024].iter() {
         group.bench_with_input(BenchmarkId::new("arena_alloc", size), size, |b, &size| {
+            let arena = Arena::with_capacity(1024 * 1024);
             b.iter(|| {
-                let arena = Arena::with_capacity(1024 * 1024);
+                let checkpoint = arena.checkpoint();
                 for i in 0..10000 {
                     let data = vec![i as u8; size];
                     let slice = arena.alloc_slice_copy(black_box(&data));
                     black_box(slice);
                 }
+                unsafe { arena.rewind_to_checkpoint(checkpoint) };
             });
         });
 
@@ -35,42 +37,50 @@ fn bench_memory_pool_performance(c: &mut Criterion) {
 
     // Test small object allocation patterns
     group.bench_function("pool_u8_pattern", |b| {
+        let arena = Arena::new();
         b.iter(|| {
-            let arena = Arena::new();
+            let checkpoint = arena.checkpoint();
             for i in 0..50000 {
                 let x = arena.alloc_u8(black_box(i as u8));
                 black_box(*x);
             }
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
     group.bench_function("pool_u32_pattern", |b| {
+        let arena = Arena::new();
         b.iter(|| {
-            let arena = Arena::new();
+            let checkpoint = arena.checkpoint();
             for i in 0..50000 {
                 let x = arena.alloc_u32(black_box(i as u32));
                 black_box(*x);
             }
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
     group.bench_function("pool_u64_pattern", |b| {
+        let arena = Arena::new();
         b.iter(|| {
-            let arena = Arena::new();
+            let checkpoint = arena.checkpoint();
             for i in 0..50000 {
                 let x = arena.alloc_u64(black_box(i as u64));
                 black_box(*x);
             }
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
     group.bench_function("generic_alloc_pattern", |b| {
+        let arena = Arena::new();
         b.iter(|| {
-            let arena = Arena::new();
+            let checkpoint = arena.checkpoint();
             for i in 0..50000 {
                 let x = arena.alloc(black_box(i as u64));
                 black_box(*x);
             }
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
@@ -87,10 +97,12 @@ fn bench_simd_performance(c: &mut Criterion) {
             BenchmarkId::new("arena_simd_copy", size),
             size,
             |b, &size| {
+                let arena = Arena::with_capacity(size * 2);
                 b.iter(|| {
-                    let arena = Arena::with_capacity(size * 2);
+                    let checkpoint = arena.checkpoint();
                     let slice = arena.alloc_slice_copy(black_box(&data));
                     black_box(slice);
+                    unsafe { arena.rewind_to_checkpoint(checkpoint) };
                 });
             },
         );
@@ -110,20 +122,22 @@ fn bench_concurrent_allocation(c: &mut Criterion) {
     let mut group = c.benchmark_group("concurrent_allocation");
 
     group.bench_function("arena_concurrent_single", |b| {
+        let arena = Arena::with_capacity(1024 * 1024);
         b.iter(|| {
-            let arena = Arena::with_capacity(1024 * 1024);
+            let checkpoint = arena.checkpoint();
             for thread in 0..4 {
                 for i in 0..2500 {
                     let x = arena.alloc((thread * 2500 + i) as u64);
                     black_box(*x);
                 }
             }
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
     group.bench_function("arena_concurrent_scope", |b| {
+        let arena = Arena::with_capacity(1024 * 1024);
         b.iter(|| {
-            let arena = Arena::with_capacity(1024 * 1024);
             for thread in 0..4 {
                 arena.scope(|scope| {
                     for i in 0..2500 {
@@ -142,8 +156,9 @@ fn bench_mixed_workload(c: &mut Criterion) {
     let mut group = c.benchmark_group("mixed_workload");
 
     group.bench_function("realistic_mixed", |b| {
+        let arena = Arena::with_capacity(1024 * 1024);
         b.iter(|| {
-            let arena = Arena::with_capacity(1024 * 1024);
+            let checkpoint = arena.checkpoint();
 
             // Mix of different allocation patterns
             for i in 0..1000 {
@@ -169,6 +184,8 @@ fn bench_mixed_workload(c: &mut Criterion) {
                     black_box(arena_str);
                 }
             }
+
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
@@ -179,12 +196,14 @@ fn bench_vs_standard_allocators(c: &mut Criterion) {
     let mut group = c.benchmark_group("vs_standard_allocators");
 
     group.bench_function("arena_vs_box", |b| {
+        let arena = Arena::new();
         b.iter(|| {
-            let arena = Arena::new();
+            let checkpoint = arena.checkpoint();
             for i in 0..10000 {
                 let arena_val = arena.alloc(black_box(i));
                 black_box(*arena_val);
             }
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
@@ -198,11 +217,13 @@ fn bench_vs_standard_allocators(c: &mut Criterion) {
     });
 
     group.bench_function("vec_vs_arena_slice", |b| {
+        let arena = Arena::new();
         b.iter(|| {
-            let arena = Arena::new();
+            let checkpoint = arena.checkpoint();
             let data: Vec<u32> = (0..1000).collect();
             let arena_slice = arena.alloc_slice_copy(black_box(&data));
             black_box(arena_slice);
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 

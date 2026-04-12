@@ -98,10 +98,6 @@ impl ThreadCache {
                 // may point inside arena chunks or other owners and
                 // freeing them can cause double-free. Skip deallocation
                 // to avoid freeing memory we don't own.
-                eprintln!(
-                    "[ThreadCache::clear] skipping dealloc ptr={:p} size={}",
-                    self.entries[i].ptr, self.entries[i].size
-                );
             }
         }
         self.used = 0;
@@ -115,10 +111,6 @@ impl ThreadCache {
             let size = self.entries[i].size;
             if size > 0 {
                 // See note in clear(): do not free cached pointers here.
-                eprintln!(
-                    "[ThreadCache::clear_partial] skipping dealloc ptr={:p} size={}",
-                    self.entries[i].ptr, self.entries[i].size
-                );
             }
         }
 
