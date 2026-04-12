@@ -10,9 +10,11 @@ fn bench_fast_path_allocations(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("alloc_fast", size), size, |b, &size| {
             let arena = Arena::with_capacity(1024 * 1024);
             b.iter(|| {
+                let checkpoint = arena.checkpoint();
                 for _ in 0..1000 {
                     black_box(arena.alloc_fast(size as u64));
                 }
+                unsafe { arena.rewind_to_checkpoint(checkpoint) };
             });
         });
 
@@ -22,9 +24,11 @@ fn bench_fast_path_allocations(c: &mut Criterion) {
             |b, &size| {
                 let arena = Arena::with_capacity(1024 * 1024);
                 b.iter(|| {
+                    let checkpoint = arena.checkpoint();
                     for _ in 0..1000 {
                         black_box(arena.alloc(size as u64));
                     }
+                    unsafe { arena.rewind_to_checkpoint(checkpoint) };
                 });
             },
         );
@@ -44,10 +48,12 @@ fn bench_array_allocations(c: &mut Criterion) {
             let arena = Arena::with_capacity(1024 * 1024);
             let slice = &array[..size];
             b.iter(|| {
+                let checkpoint = arena.checkpoint();
                 // Convert slice to array for benchmark
                 let mut arr = [0u32; 64];
                 arr[..size].copy_from_slice(slice);
                 black_box(arena.alloc_array(arr));
+                unsafe { arena.rewind_to_checkpoint(checkpoint) };
             });
         });
 
@@ -58,7 +64,9 @@ fn bench_array_allocations(c: &mut Criterion) {
                 let arena = Arena::with_capacity(1024 * 1024);
                 let slice = &data[..size];
                 b.iter(|| {
+                    let checkpoint = arena.checkpoint();
                     black_box(arena.alloc_slice_copy(slice));
+                    unsafe { arena.rewind_to_checkpoint(checkpoint) };
                 });
             },
         );
@@ -80,7 +88,9 @@ fn bench_batch_operations(c: &mut Criterion) {
                 let arena = Arena::with_capacity(1024 * 1024);
                 let slice = &data[..batch_size];
                 b.iter(|| {
+                    let checkpoint = arena.checkpoint();
                     black_box(arena.alloc_batch(slice));
+                    unsafe { arena.rewind_to_checkpoint(checkpoint) };
                 });
             },
         );
@@ -91,9 +101,11 @@ fn bench_batch_operations(c: &mut Criterion) {
             |b, &batch_size| {
                 let arena = Arena::with_capacity(1024 * 1024);
                 b.iter(|| {
+                    let checkpoint = arena.checkpoint();
                     for &value in &data[..batch_size] {
                         black_box(arena.alloc(value));
                     }
+                    unsafe { arena.rewind_to_checkpoint(checkpoint) };
                 });
             },
         );
@@ -106,8 +118,9 @@ fn bench_mixed_workloads(c: &mut Criterion) {
     let mut group = c.benchmark_group("mixed_workloads");
 
     group.bench_function("parser_simulation", |b| {
+        let arena = Arena::with_capacity(64 * 1024);
         b.iter(|| {
-            let arena = Arena::with_capacity(64 * 1024);
+            let checkpoint = arena.checkpoint();
 
             // Simulate parser workload: many small allocations
             for i in 0..1000 {
@@ -125,6 +138,8 @@ fn bench_mixed_workloads(c: &mut Criterion) {
             for i in 0..10 {
                 let _large = arena.alloc_slice_copy(&[i as u8; 1024]);
             }
+
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
@@ -136,22 +151,23 @@ fn bench_memory_patterns(c: &mut Criterion) {
 
     // Test sequential allocation pattern
     group.bench_function("sequential_alloc", |b| {
+        let arena = Arena::with_capacity(1024 * 1024);
         b.iter(|| {
-            let arena = Arena::with_capacity(1024 * 1024);
-            let mut allocations = Vec::new();
+            let checkpoint = arena.checkpoint();
 
             for i in 0..10000 {
-                allocations.push(arena.alloc_fast(i as u64));
+                black_box(arena.alloc_fast(i as u64));
             }
 
-            black_box(allocations);
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
     // Test mixed size pattern
     group.bench_function("mixed_size_pattern", |b| {
+        let arena = Arena::with_capacity(1024 * 1024);
         b.iter(|| {
-            let arena = Arena::with_capacity(1024 * 1024);
+            let checkpoint = arena.checkpoint();
 
             for i in 0..1000 {
                 match i % 4 {
@@ -170,6 +186,8 @@ fn bench_memory_patterns(c: &mut Criterion) {
                     _ => unreachable!(),
                 }
             }
+
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 

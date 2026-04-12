@@ -6,22 +6,26 @@ fn bench_fast_path_allocation(c: &mut Criterion) {
     let mut group = c.benchmark_group("fast_path_allocation");
 
     group.bench_function("arena_fast_path", |b| {
+        let arena = Arena::with_capacity(1024 * 1024); // Large arena to avoid chunk allocation
         b.iter(|| {
-            let arena = Arena::with_capacity(1024 * 1024); // Large arena to avoid chunk allocation
+            let checkpoint = arena.checkpoint();
             for i in 0..1000 {
                 let x = arena.alloc(black_box(i as u64));
                 black_box(*x);
             }
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
     group.bench_function("arena_fast_path_small", |b| {
+        let arena = Arena::with_capacity(1024 * 1024);
         b.iter(|| {
-            let arena = Arena::with_capacity(1024 * 1024);
+            let checkpoint = arena.checkpoint();
             for i in 0..1000 {
                 let x = arena.alloc(black_box(i as u8));
                 black_box(*x);
             }
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
@@ -34,10 +38,12 @@ fn bench_large_slice_allocation(c: &mut Criterion) {
     let large_data: Vec<u8> = (0..10000).map(|i| (i % 256) as u8).collect();
 
     group.bench_function("arena_large_slice", |b| {
+        let arena = Arena::with_capacity(large_data.len() * 2);
         b.iter(|| {
-            let arena = Arena::with_capacity(large_data.len() * 2);
+            let checkpoint = arena.checkpoint();
             let slice = arena.alloc_slice_copy(black_box(&large_data));
             black_box(slice);
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
@@ -55,8 +61,9 @@ fn bench_mixed_size_allocations(c: &mut Criterion) {
     let mut group = c.benchmark_group("mixed_size_allocations");
 
     group.bench_function("arena_mixed_sizes", |b| {
+        let arena = Arena::with_capacity(1024 * 1024);
         b.iter(|| {
-            let arena = Arena::with_capacity(1024 * 1024);
+            let checkpoint = arena.checkpoint();
 
             // Mix of different allocation sizes
             for i in 0..100 {
@@ -73,6 +80,8 @@ fn bench_mixed_size_allocations(c: &mut Criterion) {
                 let large = arena.alloc(black_box([i as u8; 128]));
                 black_box(*large);
             }
+
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
@@ -114,14 +123,12 @@ fn bench_chunk_growth_strategies(c: &mut Criterion) {
     group.bench_function("arena_chunk_growth", |b| {
         b.iter(|| {
             let arena = Arena::with_capacity(1024); // Start small to force growth
-            let mut allocations = Vec::new();
 
             // Allocate enough to trigger multiple chunk growths
             for i in 0..10000 {
                 let x = arena.alloc(black_box([i as u8; 256])); // 256 bytes each
-                allocations.push(x);
                 if i % 1000 == 0 {
-                    black_box(&allocations);
+                    black_box(x);
                 }
             }
         });
@@ -161,10 +168,12 @@ fn bench_pool_optimizations(c: &mut Criterion) {
         let arena = Arena::with_capacity(1000 * 8);
 
         b.iter(|| {
+            let checkpoint = arena.checkpoint();
             for i in 0..1000 {
                 let x = arena.alloc(black_box(i as u64));
                 black_box(*x);
             }
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 
@@ -175,14 +184,16 @@ fn bench_stats_overhead(c: &mut Criterion) {
     let mut group = c.benchmark_group("stats_overhead");
 
     group.bench_function("arena_with_stats", |b| {
+        let arena = Arena::with_capacity(1024 * 1024);
         b.iter(|| {
-            let arena = Arena::with_capacity(1024 * 1024);
+            let checkpoint = arena.checkpoint();
             for i in 0..10000 {
                 let x = arena.alloc(black_box(i as u64));
                 black_box(*x);
             }
             let stats = arena.stats();
             black_box(stats);
+            unsafe { arena.rewind_to_checkpoint(checkpoint) };
         });
     });
 

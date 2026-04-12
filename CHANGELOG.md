@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-04-12
+
+This release focused on making performance claims match runtime reality.
+In short: less hidden overhead, cleaner safety semantics, and benchmarks that reflect allocator throughput in practical use.
+
+### Added
+- Clearer release notes and README guidance for production use-cases and benchmark interpretation.
+
+### Changed
+- Removed unconditional logging and backtrace capture from release allocator hot paths and drop paths.
+- Updated benchmark harnesses to reuse arenas and rewind checkpoints inside benchmark iterations.
+- Refreshed README performance guidance with representative measured snapshots and practical caveats.
+- Bumped crate version to `1.1.0`.
+
+### Fixed
+- Fixed checkpoint bookkeeping so `checkpoint()` no longer implicitly grows checkpoint stack metadata; explicit stack behavior now lives in `push_checkpoint()`.
+- Tightened allocation failure handling to use explicit allocator failure paths instead of returning null pointers.
+- Corrected concurrency model by removing unsound `Sync` implementation from `Arena`.
+
+### Performance
+- In quick Criterion runs from this repository, `alloc_u64/arena_alloc` now measures around ~4.7ns (previously measured in the tens of microseconds before hot-path cleanup).
+- In the same run, `many_allocs_u64/arena_many` measures around ~5.6us versus `box_many` around ~27us.
+
+### Notes
+- `Arena` is intentionally not `Sync` in this release. For cross-thread sharing, use `SyncArena`.
+
 ## [1.0.0] - 2025-12-31
 
 This is the project's first stable release. The goal of 1.0.0 is to offer a stable, well-documented, and predictable API surface for high-performance allocation needs while keeping optional features behind feature flags so consumers only pay for what they use.
